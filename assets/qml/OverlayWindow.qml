@@ -11,8 +11,23 @@ Window {
     visibility: Window.FullScreen
     color: "transparent"
 
+    // 随机语录库
+    property var quotes: [
+        "身体是革命的本钱，起来充充电吧 ⚡",
+        "久坐伤身，动动更健康 🏃",
+        "喝口水，伸个懒腰，精神百倍 💪",
+        "现在的休息，是为了更好的出发 🚀",
+        "保护脊椎，人人有责 🦴",
+        "在这个Bug改完之前，先改改你的坐姿 🧘",
+        "代码可以重构，身体只有一个 ❤️"
+    ]
+
     // 公开方法：显示提醒
     function showReminder() {
+        // 随机切换语录
+        var idx = Math.floor(Math.random() * quotes.length);
+        quoteText.text = quotes[idx];
+
         overlayWin.visible = true
         overlayWin.showFullScreen()
         overlayWin.raise()
@@ -135,6 +150,28 @@ Window {
                     ctx.stroke()
                 }
             }
+
+            // 科技感旋转虚线圈
+            Item {
+                anchors.fill: parent
+                anchors.margins: -25
+                RotationAnimation on rotation {
+                    loops: Animation.Infinite
+                    from: 0; to: 360; duration: 20000
+                }
+                Canvas {
+                    anchors.fill: parent
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"
+                        ctx.lineWidth = 2
+                        ctx.setLineDash([15, 30]) // 虚线样式
+                        ctx.beginPath()
+                        ctx.arc(width/2, height/2, width/2-2, 0, 2*Math.PI)
+                        ctx.stroke()
+                    }
+                }
+            }
         }
         
         // 文字区
@@ -157,6 +194,7 @@ Window {
             }
             
             Text {
+                id: quoteText
                 text: "身体是革命的本钱，起来充充电吧 ⚡"
                 color: "#E0F2F1"
                 font.pixelSize: 22
@@ -182,7 +220,7 @@ Window {
             height: 70
             
             background: Rectangle {
-                color: parent.down ? "#dddddd" : "#ffffff"
+                color: parent.down ? "#dddddd" : (parent.hovered ? "#f0f0f0" : "#ffffff")
                 radius: 35
                 
                 // 按钮阴影
@@ -193,6 +231,17 @@ Window {
                     radius: 35
                     color: "black"
                     opacity: 0.3
+                }
+                
+                // 悬停光晕
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 35
+                    color: "transparent"
+                    border.color: "white"
+                    border.width: 2
+                    opacity: parent.parent.hovered ? 0.5 : 0
+                    Behavior on opacity { NumberAnimation { duration: 200 } }
                 }
             }
             
@@ -217,10 +266,11 @@ Window {
             height: 70
             
             background: Rectangle {
-                color: parent.down ? "#55000000" : "#33000000"
+                color: parent.down ? "#55000000" : (parent.hovered ? "#44000000" : "#33000000")
                 radius: 35
-                border.color: "white"
-                border.width: 2
+                border.color: parent.hovered ? "white" : "#e0e0e0"
+                border.width: parent.hovered ? 3 : 2
+                Behavior on border.width { NumberAnimation { duration: 100 } }
             }
             
             contentItem: Text {
