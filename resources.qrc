@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/qml/Main.qml</file>
+        <file>assets/qml/OverlayWindow.qml</file>
+    </qresource>
+</RCC>
