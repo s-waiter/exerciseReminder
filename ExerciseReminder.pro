@@ -7,11 +7,13 @@ TEMPLATE = app
 SOURCES += \
     src/main.cpp \
     src/core/TimerEngine.cpp \
-    src/gui/TrayIcon.cpp
+    src/gui/TrayIcon.cpp \
+    src/core/AppConfig.cpp
 
 HEADERS += \
     src/core/TimerEngine.h \
-    src/gui/TrayIcon.h
+    src/gui/TrayIcon.h \
+    src/core/AppConfig.h
 
 RESOURCES += resources.qrc
 

@@ -43,3 +43,6 @@
 *   `assets/qml/`: QML 界面文件
 *   `resources.qrc`: 资源配置文件
 *   `ExerciseReminder.pro`: qmake 项目文件
+
+## 发布与部署
+双击运行根目录下的 `build_and_deploy.bat` 脚本（需在 Qt 命令行环境中），即可自动编译 Release 版本并生成包含所有依赖的 `ExerciseReminder_Dist` 文件夹。将该文件夹压缩发送给用户即可使用。

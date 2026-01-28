@@ -218,7 +218,7 @@ Window {
                     }
                 }
                 
-                // 模式显示卡片
+                // 模式显示卡片 (已替换为开机自启)
                 Rectangle {
                     width: 100
                     height: 60
@@ -227,15 +227,45 @@ Window {
                     
                     Column {
                         anchors.centerIn: parent
-                        Text { 
-                            text: "WORK"
-                            color: "white"
-                            font.bold: true
-                            font.pixelSize: 14
+                        spacing: 2
+                        
+                        // 开机自启开关 (缩小版以适应卡片)
+                        Switch {
+                            id: autoStartSwitch
                             anchors.horizontalCenter: parent.horizontalCenter
+                            checked: appConfig.autoStart
+                            scale: 0.7 // 缩小比例
+                            height: 30
+                            
+                            onCheckedChanged: {
+                                if (appConfig.autoStart !== checked) {
+                                    appConfig.autoStart = checked
+                                }
+                            }
+                            
+                            indicator: Rectangle {
+                                implicitWidth: 48
+                                implicitHeight: 26
+                                x: parent.leftPadding
+                                y: parent.height / 2 - height / 2
+                                radius: 13
+                                color: parent.checked ? "#00d2ff" : "#2C3E50"
+                                border.color: parent.checked ? "#00d2ff" : "#cccccc"
+                                
+                                Rectangle {
+                                    x: parent.checked ? parent.width - width - 2 : 2
+                                    y: 2
+                                    width: 22
+                                    height: 22
+                                    radius: 11
+                                    color: "white"
+                                    Behavior on x { NumberAnimation { duration: 100 } }
+                                }
+                            }
                         }
+
                         Text { 
-                            text: "MODE"
+                            text: "AUTO START"
                             color: "#8899A6"
                             font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -249,7 +279,7 @@ Window {
                 id: settingsPopup
                 anchors.centerIn: parent
                 width: 260
-                height: 180
+                height: 230
                 modal: true
                 focus: true
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside

@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QDebug>
+#include "core/AppConfig.h"
 #include "core/TimerEngine.h"
 #include "gui/TrayIcon.h"
 
@@ -19,6 +20,7 @@ int main(int argc, char *argv[])
     // 3. 初始化核心模块
     TimerEngine timerEngine;
     TrayIcon trayIcon;
+    AppConfig appConfig;
 
     // 4. 连接 C++ 内部信号
     // 当计时器更新时，更新托盘提示信息
@@ -38,6 +40,7 @@ int main(int argc, char *argv[])
     // 在 QML 中可以直接使用 `timerEngine` 和 `trayIcon` 标识符
     engine.rootContext()->setContextProperty("timerEngine", &timerEngine);
     engine.rootContext()->setContextProperty("trayIcon", &trayIcon);
+    engine.rootContext()->setContextProperty("appConfig", &appConfig);
 
     // 加载主 QML 文件
     const QUrl url(QStringLiteral("qrc:/assets/qml/Main.qml"));
