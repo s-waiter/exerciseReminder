@@ -46,6 +46,7 @@ qrc_*.cpp
 build-*/
 debug/
 release/
+build/
 
 # VS Code
 .vscode/

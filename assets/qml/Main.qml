@@ -41,17 +41,25 @@ Window {
         
         // 高科技感渐变背景
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#141E30" } // 深蓝黑
-            GradientStop { position: 1.0; color: "#243B55" } // 深灰蓝
+            GradientStop {
+                position: 0.0
+                color: "#141E30"
+            } // 深蓝黑
+            GradientStop {
+                position: 1.0
+                color: "#243B55"
+            } // 深灰蓝
         }
 
         // 装饰性光晕
         Rectangle {
-            width: 300; height: 300
+            width: 300
+            height: 300
             radius: 150
             color: "#00d2ff"
             opacity: 0.05
-            x: -50; y: -50
+            x: -50
+            y: -50
         }
         
         // 顶部标题栏区域
