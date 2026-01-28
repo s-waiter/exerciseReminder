@@ -1,0 +1,63 @@
+# Qt Creator / qmake generated files
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+Makefile*
+object_script.*
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Qt generated files (moc, ui, rcc)
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+.qmake.cache
+.qmake.stash
+
+# Qt Creator build directories
+build-*/
+debug/
+release/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
