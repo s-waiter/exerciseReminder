@@ -1,4 +1,4 @@
-QT += core gui qml quick widgets
+QT += core gui qml quick widgets svg
 CONFIG += c++17
 
 TARGET = ExerciseReminder
