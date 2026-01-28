@@ -1,86 +1,284 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
+import QtGraphicalEffects 1.15 // 需要在 pro 中添加 QT += graphicaleffects (如果是动态编译) 或者直接使用
 
-// 主窗口/设置窗口
-// 注意：该窗口默认隐藏，只有点击托盘或首次运行时才可能显示
+// 注意：如果 GraphicalEffects 不可用，可以移除相关效果。
+// 为了确保兼容性，这里尽量使用基础图形或 Canvas。
+
 Window {
     id: mainWindow
-    width: 400
-    height: 300
-    visible: false // 初始隐藏，静默启动
-    title: "久坐提醒助手设置"
+    width: 360
+    height: 520
+    visible: false
+    title: "久坐提醒助手"
+    color: "transparent" // 透明背景，为了自定义圆角或异形窗口（如果 flag 允许）
     
-    // 连接 C++ 托盘对象的信号
+    // 窗口标志：去除默认标题栏，自定义边框
+    flags: Qt.FramelessWindowHint | Qt.Window
+    
+    // 拖拽窗口逻辑
+    MouseArea {
+        anchors.fill: parent
+        property point lastMousePos: Qt.point(0, 0)
+        onPressed: { lastMousePos = Qt.point(mouseX, mouseY); }
+        onPositionChanged: {
+            if (pressed) {
+                var dx = mouseX - lastMousePos.x
+                var dy = mouseY - lastMousePos.y
+                mainWindow.x += dx
+                mainWindow.y += dy
+            }
+        }
+    }
+
+    // 主背景容器
+    Rectangle {
+        id: bgRect
+        anchors.fill: parent
+        radius: 20
+        clip: true
+        
+        // 高科技感渐变背景
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#141E30" } // 深蓝黑
+            GradientStop { position: 1.0; color: "#243B55" } // 深灰蓝
+        }
+
+        // 装饰性光晕
+        Rectangle {
+            width: 300; height: 300
+            radius: 150
+            color: "#00d2ff"
+            opacity: 0.05
+            x: -50; y: -50
+        }
+        
+        // 顶部标题栏区域
+        Item {
+            id: titleBar
+            width: parent.width
+            height: 50
+            anchors.top: parent.top
+            
+            Text {
+                text: "EXERCISE REMINDER"
+                color: "#8899A6"
+                font.pixelSize: 12
+                font.letterSpacing: 2
+                font.bold: true
+                anchors.centerIn: parent
+            }
+
+            // 关闭/隐藏按钮
+            Button {
+                width: 30
+                height: 30
+                anchors.right: parent.right
+                anchors.rightMargin: 15
+                anchors.verticalCenter: parent.verticalCenter
+                background: Rectangle { color: "transparent" }
+                contentItem: Text {
+                    text: "×"
+                    color: "white"
+                    font.pixelSize: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: mainWindow.hide()
+            }
+        }
+
+        // 核心内容区
+        Column {
+            anchors.centerIn: parent
+            spacing: 30
+            
+            // 1. 环形进度条 + 时间显示
+            Item {
+                width: 220
+                height: 220
+                anchors.horizontalCenter: parent.horizontalCenter
+                
+                // 外圈轨道
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width/2
+                    color: "transparent"
+                    border.color: "#33ffffff"
+                    border.width: 4
+                }
+
+                // 进度圆环 (Canvas 绘制)
+                Canvas {
+                    id: progressCanvas
+                    anchors.fill: parent
+                    rotation: -90 // 从12点方向开始
+                    
+                    // 绑定属性以便重绘
+                    property double progress: timerEngine.remainingSeconds / (45 * 60.0)
+                    onProgressChanged: requestPaint()
+
+                    onPaint: {
+                        var ctx = getContext("2d");
+                        var centerX = width / 2;
+                        var centerY = height / 2;
+                        var radius = width / 2 - 4; // 减去边框宽度
+                        
+                        ctx.clearRect(0, 0, width, height);
+                        
+                        // 绘制进度弧
+                        ctx.beginPath();
+                        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
+                        ctx.lineWidth = 8;
+                        ctx.lineCap = "round";
+                        
+                        // 渐变色画笔
+                        var gradient = ctx.createLinearGradient(0, 0, width, height);
+                        gradient.addColorStop(0, "#00d2ff"); // 青色
+                        gradient.addColorStop(1, "#3a7bd5"); // 蓝色
+                        ctx.strokeStyle = gradient;
+                        
+                        ctx.stroke();
+                    }
+                }
+                
+                // 中心时间文字
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 5
+                    
+                    Text {
+                        property int mins: Math.floor(timerEngine.remainingSeconds / 60)
+                        property int secs: timerEngine.remainingSeconds % 60
+                        // 补零格式化
+                        text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
+                        color: "#ffffff"
+                        font.pixelSize: 48
+                        font.family: "Segoe UI Light" // 细体字更有科技感
+                        font.weight: Font.Light
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    
+                    Text {
+                        text: timerEngine.statusText
+                        color: "#00d2ff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        opacity: 0.8
+                    }
+                }
+            }
+            
+            // 2. 状态/数据面板
+            Row {
+                spacing: 20
+                anchors.horizontalCenter: parent.horizontalCenter
+                
+                Repeater {
+                    model: [
+                        { label: "INTERVAL", value: "45 MIN" },
+                        { label: "MODE", value: "WORK" }
+                    ]
+                    delegate: Rectangle {
+                        width: 100
+                        height: 60
+                        color: "#1Affffff"
+                        radius: 10
+                        
+                        Column {
+                            anchors.centerIn: parent
+                            Text { 
+                                text: modelData.value
+                                color: "white"
+                                font.bold: true
+                                font.pixelSize: 14
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                            Text { 
+                                text: modelData.label
+                                color: "#8899A6"
+                                font.pixelSize: 10
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. 底部操作按钮
+            Row {
+                spacing: 15
+                anchors.horizontalCenter: parent.horizontalCenter
+                
+                // 自定义按钮组件
+                component CyberButton : Button {
+                    property string btnColor: "#3a7bd5"
+                    
+                    background: Rectangle {
+                        color: parent.down ? Qt.darker(btnColor, 1.2) : btnColor
+                        radius: 25
+                        border.width: 1
+                        border.color: "#55ffffff"
+                        
+                        // 按钮光效
+                        layer.enabled: parent.hovered
+                        // 简单模拟发光，不依赖 GraphicalEffects
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 25
+                            color: "white"
+                            opacity: parent.parent.hovered ? 0.1 : 0
+                        }
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "white"
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    width: 120
+                    height: 45
+                }
+
+                CyberButton {
+                    text: "立即休息"
+                    btnColor: "#3a7bd5"
+                    onClicked: overlay.showReminder()
+                }
+
+                CyberButton {
+                    text: "重置"
+                    btnColor: "#2C3E50"
+                    onClicked: timerEngine.startWork()
+                }
+            }
+        }
+    }
+
+    // 实例化全屏提醒窗口组件
+    OverlayWindow {
+        id: overlay
+    }
+
+    // 连接信号
     Connections {
         target: trayIcon
         function onShowSettingsRequested() {
             mainWindow.visible = true
             mainWindow.raise()
             mainWindow.requestActivate()
+            // 居中显示在屏幕
+            mainWindow.x = (Screen.width - mainWindow.width) / 2
+            mainWindow.y = (Screen.height - mainWindow.height) / 2
         }
     }
 
-    Column {
-        anchors.centerIn: parent
-        spacing: 20
-
-        Text {
-            text: "当前状态: " + timerEngine.statusText
-            font.pixelSize: 18
-            color: "#333333"
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-
-        Text {
-            // 简单的时间格式化
-            property int mins: Math.floor(timerEngine.remainingSeconds / 60)
-            property int secs: timerEngine.remainingSeconds % 60
-            text: "剩余时间: " + mins + " 分 " + secs + " 秒"
-            font.pixelSize: 24
-            font.bold: true
-            color: "#2C3E50"
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-        
-        // 分隔线
-        Rectangle {
-            width: parent.width * 0.8
-            height: 1
-            color: "#CCCCCC"
-            anchors.horizontalCenter: parent.horizontalCenter
-        }
-
-        Button {
-            text: "立即休息 (测试)"
-            width: 200
-            onClicked: overlay.showReminder()
-        }
-        
-        Button {
-            text: "隐藏到托盘"
-            width: 200
-            onClicked: mainWindow.hide()
-        }
-        
-        Button {
-            text: "重置计时"
-            width: 200
-            onClicked: timerEngine.startWork()
-        }
-    }
-
-    // 实例化全屏提醒窗口组件
-    // 这只是创建了对象，具体显示逻辑在 OverlayWindow 内部或由外部调用
-    OverlayWindow {
-        id: overlay
-    }
-
-    // 监听 C++ 计时器的提醒信号
     Connections {
         target: timerEngine
         function onReminderTriggered() {
-            // 当倒计时结束时，显示全屏提醒
             overlay.showReminder()
         }
     }
