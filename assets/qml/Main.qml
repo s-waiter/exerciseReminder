@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
+import QtQml 2.15 // for Instantiator
 import QtGraphicalEffects 1.15 // 需要在 pro 中添加 QT += graphicaleffects (如果是动态编译) 或者直接使用
 
 // 注意：如果 GraphicalEffects 不可用，可以移除相关效果。
@@ -293,8 +294,8 @@ Window {
                                 verticalAlignment: Text.AlignVCenter
                             }
                             onClicked: {
-                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes > 5) {
-                                    timerEngine.workDurationMinutes -= 5
+                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes > 1) {
+                                    timerEngine.workDurationMinutes -= 1
                                 }
                             }
                         }
@@ -326,7 +327,7 @@ Window {
                             }
                             onClicked: {
                                 if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes < 120) {
-                                    timerEngine.workDurationMinutes += 5
+                                    timerEngine.workDurationMinutes += 1
                                 }
                             }
                         }
@@ -373,7 +374,10 @@ Window {
                 CyberButton {
                     text: "立即休息"
                     btnColor: "#3a7bd5"
-                    onClicked: overlay.showReminder()
+                    onClicked: {
+                        themeController.generateRandomTheme()
+                        isReminderActive = true
+                    }
                 }
 
                 CyberButton {
@@ -385,9 +389,28 @@ Window {
         }
     }
 
-    // 实例化全屏提醒窗口组件
-    OverlayWindow {
-        id: overlay
+    // 主题控制器
+    ThemeController {
+        id: themeController
+    }
+    
+    // 全局提醒激活状态
+    property bool isReminderActive: false
+
+    // 多屏实例化全屏提醒窗口
+    Instantiator {
+        model: Qt.application.screens
+        delegate: OverlayWindow {
+            screen: modelData // 绑定到对应屏幕
+            themeData: themeController.currentTheme
+            visible: isReminderActive
+            
+            onReminderFinished: isReminderActive = false
+            onSnoozeRequested: {
+                timerEngine.snooze()
+                isReminderActive = false
+            }
+        }
     }
 
     // 连接信号
@@ -406,7 +429,8 @@ Window {
     Connections {
         target: timerEngine
         function onReminderTriggered() {
-            overlay.showReminder()
+            themeController.generateRandomTheme()
+            isReminderActive = true
         }
     }
 }

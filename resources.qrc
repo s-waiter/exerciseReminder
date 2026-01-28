@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file>assets/qml/Main.qml</file>
         <file>assets/qml/OverlayWindow.qml</file>
+        <file>assets/qml/ThemeController.qml</file>
     </qresource>
 </RCC>
