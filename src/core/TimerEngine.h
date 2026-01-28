@@ -11,15 +11,20 @@ class TimerEngine : public QObject
     Q_PROPERTY(int remainingSeconds READ remainingSeconds NOTIFY timeUpdated)
     // 暴露给QML的属性：当前状态描述
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
+    // 暴露给QML的属性：工作间隔（分钟）
+    Q_PROPERTY(int workDurationMinutes READ workDurationMinutes WRITE setWorkDurationMinutes NOTIFY workDurationMinutesChanged)
 
 public:
     explicit TimerEngine(QObject *parent = nullptr);
 
     int remainingSeconds() const;
     QString statusText() const;
+    int workDurationMinutes() const;
 
 public slots:
-    // 开始工作计时（重置为45分钟）
+    // 设置工作间隔（分钟）
+    void setWorkDurationMinutes(int minutes);
+    // 开始工作计时（重置为设定间隔）
     void startWork();
     // 贪睡模式（重置为5分钟）
     void snooze();
@@ -33,6 +38,10 @@ signals:
     void statusChanged();
     // 倒计时结束，触发提醒
     void reminderTriggered();
+    // 工作间隔变更信号
+    void workDurationMinutesChanged();
+    // 休息结束信号，带有时长（秒）
+    void breakFinished(int durationSeconds);
 
 private slots:
     void onTick();
@@ -40,7 +49,8 @@ private slots:
 private:
     QTimer *m_timer;
     int m_remainingSecs;
-    const int m_workDuration = 45 * 60; // 45分钟
+    int m_workDuration; // 单位：秒
     const int m_snoozeDuration = 5 * 60; // 5分钟
     QString m_status;
+    QDateTime m_breakStartTime; // 休息开始时间
 };

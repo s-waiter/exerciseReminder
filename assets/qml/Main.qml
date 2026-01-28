@@ -184,31 +184,150 @@ Window {
                 spacing: 20
                 anchors.horizontalCenter: parent.horizontalCenter
                 
-                Repeater {
-                    model: [
-                        { label: "INTERVAL", value: "45 MIN" },
-                        { label: "MODE", value: "WORK" }
-                    ]
-                    delegate: Rectangle {
-                        width: 100
-                        height: 60
-                        color: "#1Affffff"
-                        radius: 10
+                // 间隔设置卡片
+                Rectangle {
+                    width: 100
+                    height: 60
+                    color: "#1Affffff"
+                    radius: 10
+                    
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: settingsPopup.open()
+                    }
+                    
+                    Column {
+                        anchors.centerIn: parent
+                        Text { 
+                            // 安全访问属性，如果未定义(旧C++)则显示默认值
+                            property var val: timerEngine.workDurationMinutes
+                            text: (val !== undefined ? val : 45) + " MIN"
+                            color: "white"
+                            font.bold: true
+                            font.pixelSize: 14
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                        Text { 
+                            text: "INTERVAL"
+                            color: "#8899A6"
+                            font.pixelSize: 10
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+                }
+                
+                // 模式显示卡片
+                Rectangle {
+                    width: 100
+                    height: 60
+                    color: "#1Affffff"
+                    radius: 10
+                    
+                    Column {
+                        anchors.centerIn: parent
+                        Text { 
+                            text: "WORK"
+                            color: "white"
+                            font.bold: true
+                            font.pixelSize: 14
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                        Text { 
+                            text: "MODE"
+                            color: "#8899A6"
+                            font.pixelSize: 10
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+                }
+            }
+
+            // 设置弹窗
+            Popup {
+                id: settingsPopup
+                anchors.centerIn: parent
+                width: 260
+                height: 180
+                modal: true
+                focus: true
+                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+                
+                background: Rectangle {
+                    color: "#243B55"
+                    radius: 15
+                    border.color: "#00d2ff"
+                    border.width: 1
+                }
+                
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 20
+                    
+                    Text {
+                        text: "设置提醒间隔"
+                        color: "white"
+                        font.bold: true
+                        font.pixelSize: 16
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    
+                    Row {
+                        spacing: 15
+                        anchors.horizontalCenter: parent.horizontalCenter
                         
-                        Column {
-                            anchors.centerIn: parent
-                            Text { 
-                                text: modelData.value
-                                color: "white"
-                                font.bold: true
-                                font.pixelSize: 14
-                                anchors.horizontalCenter: parent.horizontalCenter
+                        Button {
+                            width: 40
+                            height: 40
+                            text: "-"
+                            background: Rectangle {
+                                color: parent.down ? "#1Affffff" : "transparent"
+                                radius: 20
+                                border.color: "white"
                             }
-                            Text { 
-                                text: modelData.label
-                                color: "#8899A6"
-                                font.pixelSize: 10
-                                anchors.horizontalCenter: parent.horizontalCenter
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                font.pixelSize: 20
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            onClicked: {
+                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes > 5) {
+                                    timerEngine.workDurationMinutes -= 5
+                                }
+                            }
+                        }
+                        
+                        Text {
+                            property var val: timerEngine.workDurationMinutes
+                            text: (val !== undefined ? val : 45) + " 分钟"
+                            color: "#00d2ff"
+                            font.pixelSize: 20
+                            font.bold: true
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        
+                        Button {
+                            width: 40
+                            height: 40
+                            text: "+"
+                            background: Rectangle {
+                                color: parent.down ? "#1Affffff" : "transparent"
+                                radius: 20
+                                border.color: "white"
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                font.pixelSize: 20
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            onClicked: {
+                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes < 120) {
+                                    timerEngine.workDurationMinutes += 5
+                                }
                             }
                         }
                     }

@@ -109,6 +109,72 @@ Window {
     // UI 实现
     // -------------------------------------------------------------------------
 
+    // 0. 反馈状态
+    property string feedbackText: ""
+    property var showTime: null
+
+    onVisibleChanged: {
+        if(visible) {
+            showTime = new Date()
+        }
+    }
+
+    Timer {
+        id: closeTimer
+        interval: 3000
+        onTriggered: {
+            overlayWin.visible = false
+            overlayWin.feedbackText = ""
+        }
+    }
+
+    // 反馈遮罩层
+    Rectangle {
+        id: feedbackLayer
+        anchors.fill: parent
+        color: "#F2000000" // 深色不透明遮罩
+        visible: overlayWin.feedbackText !== ""
+        z: 999
+        
+        MouseArea {
+            anchors.fill: parent
+            // 阻止点击穿透，防止重复点击按钮
+        }
+        
+        Column {
+            anchors.centerIn: parent
+            spacing: 30
+            
+            Text {
+                text: "🎉 太棒了！"
+                color: "#FFD700" // 金色
+                font.pixelSize: 60
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+                ScaleAnimator on scale {
+                    from: 0.5
+                    to: 1.0
+                    duration: 500
+                    easing.type: Easing.OutBack
+                    running: feedbackLayer.visible
+                }
+            }
+            
+            Text {
+                text: overlayWin.feedbackText
+                color: "white"
+                font.pixelSize: 32
+                anchors.horizontalCenter: parent.horizontalCenter
+                opacity: 0
+                NumberAnimation on opacity {
+                    to: 1.0
+                    duration: 500
+                    running: feedbackLayer.visible
+                }
+            }
+        }
+    }
+
     // 1. 动态渐变背景
     Rectangle {
         id: bg
@@ -544,8 +610,26 @@ Window {
             }
             
             onClicked: {
+                // 1. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
+                var now = new Date()
+                var durationSeconds = 0
+                if(overlayWin.showTime) {
+                    durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
+                }
+                
+                var mins = Math.floor(durationSeconds / 60)
+                var secs = durationSeconds % 60
+                var timeStr = ""
+                if(mins > 0) timeStr += mins + " 分 "
+                timeStr += secs + " 秒"
+                
+                overlayWin.feedbackText = "本次运动时长: " + timeStr
+                
+                // 2. 显示反馈并准备关闭
+                closeTimer.restart()
+                
+                // 3. 通知后端重置计时器
                 timerEngine.startWork()
-                overlayWin.visible = false
             }
         }
         
