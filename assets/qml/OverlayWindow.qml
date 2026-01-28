@@ -2,13 +2,14 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtQuick.Particles 2.0
+import QtGraphicalEffects 1.15
 
 Window {
     id: overlayWin
     visible: false
     // 强制全屏 + 置顶 + 无边框
     flags: Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
-    visibility: Window.FullScreen
+    // visibility: Window.FullScreen // 移除初始的 visibility 设置，避免冲突
     color: "transparent"
 
     // -------------------------------------------------------------------------
@@ -128,48 +129,263 @@ Window {
         }
     }
 
-    // 反馈遮罩层
+    // 反馈遮罩层 (全屏模糊背景)
     Rectangle {
         id: feedbackLayer
         anchors.fill: parent
-        color: "#F2000000" // 深色不透明遮罩
+        color: "transparent"
         visible: overlayWin.feedbackText !== ""
         z: 999
-        
-        MouseArea {
+
+        // 1. 背景模糊与变暗
+        Rectangle {
             anchors.fill: parent
-            // 阻止点击穿透，防止重复点击按钮
+            color: "#CC000510" // 80% 不透明度的深色背景
+            opacity: feedbackLayer.visible ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 500 } }
         }
-        
-        Column {
-            anchors.centerIn: parent
-            spacing: 30
+
+        MouseArea { anchors.fill: parent } // 阻止交互
+
+        // 2. 庆祝粒子系统 (从底部升起的金色气泡)
+        ParticleSystem {
+            id: celebrationSys
+            anchors.fill: parent
+            running: feedbackLayer.visible
             
-            Text {
-                text: "🎉 太棒了！"
-                color: "#FFD700" // 金色
-                font.pixelSize: 60
-                font.bold: true
+            ItemParticle {
+                delegate: Rectangle {
+                    width: Math.random() * 6 + 2
+                    height: width
+                    radius: width/2
+                    color: currentTheme.gradientEnd
+                    opacity: 0.6
+                }
+                fade: true
+            }
+
+            Emitter {
+                anchors.bottom: parent.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
-                ScaleAnimator on scale {
-                    from: 0.5
-                    to: 1.0
-                    duration: 500
-                    easing.type: Easing.OutBack
-                    running: feedbackLayer.visible
+                width: parent.width
+                emitRate: 20
+                lifeSpan: 4000
+                size: 10
+                sizeVariation: 5
+                velocity: PointDirection { y: -200; yVariation: 100 }
+                acceleration: PointDirection { y: -50 }
+            }
+        }
+
+        // 3. 核心卡片容器
+        Item {
+            id: resultCard
+            width: 420
+            height: 520
+            anchors.centerIn: parent
+            
+            // 进场动画：从下往上浮现 + 缩放
+            transform: [
+                Translate {
+                    y: feedbackLayer.visible ? 0 : 100
+                    Behavior on y { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                },
+                Scale {
+                    origin.x: resultCard.width/2
+                    origin.y: resultCard.height/2
+                    xScale: feedbackLayer.visible ? 1.0 : 0.8
+                    yScale: feedbackLayer.visible ? 1.0 : 0.8
+                    Behavior on xScale { NumberAnimation { duration: 600; easing.type: Easing.OutBack } }
+                    Behavior on yScale { NumberAnimation { duration: 600; easing.type: Easing.OutBack } }
+                }
+            ]
+            opacity: feedbackLayer.visible ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 400 } }
+
+            // 卡片背景 (玻璃拟态)
+            Rectangle {
+                id: cardBg
+                anchors.fill: parent
+                radius: 24
+                color: "#D91a1a1a" // 深灰半透
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.1)
+                
+                // 内部微光
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 24
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.05) }
+                        GradientStop { position: 0.4; color: "transparent" }
+                    }
                 }
             }
             
-            Text {
-                text: overlayWin.feedbackText
-                color: "white"
-                font.pixelSize: 32
-                anchors.horizontalCenter: parent.horizontalCenter
-                opacity: 0
-                NumberAnimation on opacity {
-                    to: 1.0
-                    duration: 500
-                    running: feedbackLayer.visible
+            // 阴影
+            DropShadow {
+                anchors.fill: cardBg
+                horizontalOffset: 0
+                verticalOffset: 20
+                radius: 40
+                samples: 17
+                color: "#80000000"
+                source: cardBg
+            }
+
+            // 卡片内容
+            Column {
+                anchors.centerIn: parent
+                spacing: 25
+                
+                // A. 动态勋章
+                Item {
+                    width: 160
+                    height: 160
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    
+                    // 外圈旋转光环
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width/2
+                        color: "transparent"
+                        border.width: 2
+                        border.color: Qt.rgba(currentTheme.gradientEnd.r, currentTheme.gradientEnd.g, currentTheme.gradientEnd.b, 0.3)
+                        
+                        RotationAnimation on rotation {
+                            loops: Animation.Infinite
+                            from: 0; to: 360; duration: 10000
+                        }
+                    }
+                    
+                    // 进度圆环 (Canvas 绘制)
+                    Canvas {
+                        id: progressCanvas
+                        anchors.fill: parent
+                        property real angle: 0
+                        property color arcColor: currentTheme.gradientEnd
+                        
+                        onAngleChanged: requestPaint()
+                        onArcColorChanged: requestPaint()
+                        
+                        onPaint: {
+                            var ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            ctx.beginPath();
+                            ctx.arc(width/2, height/2, width/2 - 8, -Math.PI/2, -Math.PI/2 + angle, false);
+                            ctx.lineWidth = 8;
+                            ctx.lineCap = "round";
+                            ctx.strokeStyle = arcColor;
+                            ctx.stroke();
+                        }
+                        
+                        // 动画驱动
+                        SequentialAnimation on angle {
+                            running: feedbackLayer.visible
+                            PauseAnimation { duration: 300 }
+                            NumberAnimation { from: 0; to: Math.PI * 2; duration: 1000; easing.type: Easing.OutQuart }
+                        }
+                    }
+                    
+                    // 中心对勾
+                    Text {
+                        anchors.centerIn: parent
+                        text: "✔"
+                        color: "white"
+                        font.pixelSize: 60
+                        scale: 0
+                        
+                        SequentialAnimation on scale {
+                            running: feedbackLayer.visible
+                            PauseAnimation { duration: 800 } // 等圆环画完一半再出来
+                            NumberAnimation { from: 0; to: 1.2; duration: 300; easing.type: Easing.OutBack }
+                            NumberAnimation { from: 1.2; to: 1.0; duration: 100 }
+                        }
+                    }
+                }
+                
+                // B. 文字信息
+                Column {
+                    spacing: 8
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    
+                    Text {
+                        text: "SESSION COMPLETE"
+                        color: "#88ffffff"
+                        font.pixelSize: 12
+                        font.letterSpacing: 3
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        opacity: 0
+                        SequentialAnimation on opacity {
+                            running: feedbackLayer.visible
+                            PauseAnimation { duration: 500 }
+                            NumberAnimation { to: 1; duration: 500 }
+                        }
+                    }
+                    
+                    Text {
+                        id: timeTextDisplay // 添加 ID 以供动画引用
+                        // 从 "本次运动时长: XX 分 XX 秒" 解析出 "XX:XX" 或保留原样但大号显示
+                        // 这里我们做个简单的解析优化，让数字更大
+                        property string rawText: overlayWin.feedbackText
+                        text: rawText.replace("本次运动时长: ", "")
+                        
+                        color: "white"
+                        font.pixelSize: 48
+                        font.weight: Font.Bold
+                        font.family: "Segoe UI" // Windows 友好字体
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            horizontalOffset: 0; verticalOffset: 0
+                            radius: 10; samples: 17; color: currentTheme.gradientEnd
+                        }
+                        
+                        scale: 0.8
+                        opacity: 0
+                        SequentialAnimation {
+                            running: feedbackLayer.visible
+                            PauseAnimation { duration: 600 }
+                            ParallelAnimation {
+                                NumberAnimation { target: timeTextDisplay; property: "opacity"; to: 1; duration: 500 }
+                                NumberAnimation { target: timeTextDisplay; property: "scale"; to: 1; duration: 500; easing.type: Easing.OutBack }
+                            }
+                        }
+                    }
+                }
+                
+                // C. 底部倒计时条
+                Item {
+                    width: 300
+                    height: 40
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    
+                    Text {
+                        text: "Restoring Work Mode..."
+                        color: "#66ffffff"
+                        font.pixelSize: 14
+                        anchors.centerIn: parent
+                    }
+                    
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width * (3000 - closeTimerCountdown.elapsed) / 3000
+                        height: 2
+                        color: currentTheme.gradientEnd
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        
+                        // 倒计时动画辅助属性
+                        Item {
+                            id: closeTimerCountdown
+                            property int elapsed: 0
+                            NumberAnimation on elapsed {
+                                running: feedbackLayer.visible
+                                from: 0; to: 3000; duration: 3000
+                            }
+                        }
+                    }
                 }
             }
         }
