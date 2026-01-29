@@ -1,41 +1,72 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
-import QtQml 2.15 // for Instantiator
-import QtGraphicalEffects 1.15
+import QtQml 2.15 // 引入 Instantiator 等高级 QML 功能
+import QtGraphicalEffects 1.15 // 引入图形特效（如圆角裁剪、阴影、模糊）
+
+// ========================================================================
+// Main.qml - 应用程序主窗口
+// ========================================================================
+// 这是程序的主界面，包含倒计时圆环、状态显示和设置面板。
+// 采用了无边框窗口设计 (Frameless Window) 和半透明背景。
+// ========================================================================
 
 Window {
     id: mainWindow
+    
+    // 动态调整窗口大小：
+    // isPinned (迷你模式): 260x260
+    // Normal (正常模式): 360x520
     width: isPinned ? 260 : 360
     height: isPinned ? 260 : 520
     visible: true
     title: "久坐提醒助手"
-    color: "transparent"
+    color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
     
-    // 窗口标志：去除默认标题栏，自定义边框
+    // ========================================================================
+    // 窗口标志 (Window Flags)
+    // ========================================================================
+    // Qt.FramelessWindowHint: 去除操作系统的标题栏和边框，完全自定义 UI。
+    // Qt.Window: 这是一个顶级窗口。
     property bool isPinned: false
     flags: Qt.FramelessWindowHint | Qt.Window
 
-    // 窗口几何属性动画：确保窗口变形和位移同步，实现平滑过渡
+    // ========================================================================
+    // 属性动画 (Behavior)
+    // ========================================================================
+    // 当 width, height, x, y 发生变化时，不立即突变，而是应用缓动动画。
+    // duration: 300ms
+    // easing.type: Easing.OutQuint (五次方的缓出曲线，开始快结束慢，手感自然)
     Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
 
+    // ========================================================================
     // 动态主题色逻辑
+    // ========================================================================
+    // 根据 timerEngine (C++ 后端) 的状态改变 UI 主色调。
+    // property 绑定会自动更新，无需手动监听信号。
     property color themeColor: {
         switch(timerEngine.statusText) {
-            case "已暂停": return "#ffbf00" // 琥珀金
-            case "请休息": return "#00ff88" // 春日绿
-            default: return "#00d2ff"       // 科技蓝
+            case "已暂停": return "#ffbf00" // 琥珀金 - 提示状态
+            case "请休息": return "#00ff88" // 春日绿 - 休息状态
+            default: return "#00d2ff"       // 科技蓝 - 工作状态
         }
     }
     
+    // ========================================================================
+    // 模式切换与视觉补偿
+    // ========================================================================
     onIsPinnedChanged: {
+        // 调用 C++ 工具类设置窗口置顶
         windowUtils.setTopMost(mainWindow, isPinned)
         
         // 视觉位置补偿逻辑：
-        // 当切换模式时，调整窗口坐标，使得倒计时圆圈在屏幕上的绝对位置保持不变，消除视觉抖动。
+        // 当切换模式时，窗口尺寸会发生变化。默认情况下，窗口左上角 (0,0) 不变，
+        // 这会导致内容看起来向左上方收缩。
+        // 为了让视觉中心（倒计时圆环）看起来还在原来的位置，我们需要反向移动窗口坐标。
+        // 
         // 计算依据：
         // 1. 水平方向：Normal宽360(中心180) -> Mini宽260(中心130)。差值 50。
         //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 50。
@@ -51,34 +82,47 @@ Window {
         }
     }
     
-    // 拖拽窗口逻辑
+    // ========================================================================
+    // 窗口拖拽逻辑
+    // ========================================================================
+    // 由于去掉了系统标题栏，我们需要自己实现窗口拖拽。
     MouseArea {
         id: windowMouseArea
         anchors.fill: parent
-        hoverEnabled: true // 启用悬停检测，用于迷你模式显示控件
+        hoverEnabled: true // 启用悬停检测，用于迷你模式下显示标题栏
         property point lastMousePos: Qt.point(0, 0)
+        
         onPressed: { lastMousePos = Qt.point(mouseX, mouseY); }
+        
         onPositionChanged: {
             if (pressed) {
+                // 计算鼠标位移差量 (dx, dy)
                 var dx = mouseX - lastMousePos.x
                 var dy = mouseY - lastMousePos.y
+                // 更新窗口位置
                 mainWindow.x += dx
                 mainWindow.y += dy
             }
         }
     }
 
+    // ========================================================================
+    // UI 内容构建
+    // ========================================================================
+    
     // 主背景容器
     Item {
         id: bgContainer
         anchors.fill: parent
         
         // 使用 OpacityMask 实现完美的圆角裁剪
+        // 这是 QtGraphicalEffects 的功能，比简单的 Rectangle.radius 效果更好，且支持子项裁剪。
         layer.enabled: true
         layer.effect: OpacityMask {
             maskSource: Rectangle {
                 width: bgContainer.width
                 height: bgContainer.height
+                // 迷你模式下变成圆形 (width/2)，正常模式下是大圆角 (20)
                 radius: isPinned ? width / 2 : 20
                 visible: false
             }
@@ -102,7 +146,7 @@ Window {
                 } // 深灰蓝
             }
 
-            // 装饰性光晕
+            // 装饰性光晕 (呼吸灯效果)
             Rectangle {
                 id: glowRect
                 // 迷你模式下居中，正常模式下保持在左上角
@@ -113,10 +157,12 @@ Window {
                 opacity: 0.05
                 x: isPinned ? (parent.width - width) / 2 : -50
                 y: isPinned ? (parent.height - height) / 2 : -50
+                
+                // 位置平滑过渡
                 Behavior on x { NumberAnimation { duration: 200 } }
                 Behavior on y { NumberAnimation { duration: 200 } }
                 
-                // 呼吸动画
+                // 呼吸动画：透明度在 0.05 到 0.15 之间循环
                 SequentialAnimation on opacity {
                     running: timerEngine.statusText === "工作中"
                     loops: Animation.Infinite
@@ -133,7 +179,7 @@ Window {
             anchors.top: parent.top
             z: 10 
             
-            // 迷你模式下自动隐藏/显示
+            // 迷你模式下自动隐藏/显示：鼠标移入时显示，移出隐藏
             opacity: isPinned ? (windowMouseArea.containsMouse ? 1.0 : 0.0) : 1.0
             Behavior on opacity { NumberAnimation { duration: 200 } }
 
@@ -144,7 +190,7 @@ Window {
                 font.letterSpacing: 2
                 font.bold: true
                 anchors.centerIn: parent
-                visible: !mainWindow.isPinned
+                visible: !mainWindow.isPinned // 迷你模式不显示标题文字
             }
 
             // 按钮容器，用于在不同模式下调整位置
@@ -169,12 +215,15 @@ Window {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
+                    // 点击并不是真正退出程序，而是隐藏窗口到托盘 (C++ SystemTray 逻辑处理)
                     onClicked: mainWindow.hide()
                 }
             }
         }
 
+        // ========================================================================
         // 核心内容区
+        // ========================================================================
         
         // 1. 环形进度条 + 时间显示 (独立于 Column，固定位置)
         Item {
@@ -201,17 +250,21 @@ Window {
             }
 
             // 进度圆环 (Canvas 绘制)
+            // Canvas 是 QtQuick 中用于 2D 绘图的元素，类似于 HTML5 Canvas。
             Canvas {
                 id: progressCanvas
                 anchors.fill: parent
-                rotation: -90 // 从12点方向开始
+                rotation: -90 // 旋转 -90 度，让起始点从 12 点钟方向开始
                 
                 // 绑定属性以便重绘
                 property double progress: {
                     var total = timerEngine.currentSessionTotalTime
+                    // 避免除以 0
                     return total > 0 ? timerEngine.remainingSeconds / total : 0
                 }
                 property color drawColor: mainWindow.themeColor
+                
+                // 当 progress 或 drawColor 变化时，请求重新绘制
                 onProgressChanged: requestPaint()
                 onDrawColorChanged: requestPaint()
 
@@ -225,11 +278,12 @@ Window {
                     
                     // 绘制进度弧
                     ctx.beginPath();
+                    // arc 参数: x, y, radius, startAngle, endAngle, antiClockwise
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
                     ctx.lineWidth = 8;
-                    ctx.lineCap = "round";
+                    ctx.lineCap = "round"; // 圆头线帽
                     
-                    // 渐变色画笔
+                    // 创建线性渐变色画笔
                     var gradient = ctx.createLinearGradient(0, 0, width, height);
                     gradient.addColorStop(0, drawColor); // 主色
                     gradient.addColorStop(1, "#3a7bd5"); // 蓝色 (可以保持蓝色基调，或者也跟随变化？跟随变化更好)
@@ -252,9 +306,10 @@ Window {
                 spacing: 5
                 
                 Text {
+                    // 使用 Math.floor 取整
                     property int mins: Math.floor(timerEngine.remainingSeconds / 60)
                     property int secs: timerEngine.remainingSeconds % 60
-                    // 补零格式化
+                    // 补零格式化: 9:5 -> 09:05
                     text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
                     color: "#ffffff"
                     font.pixelSize: 48
@@ -287,14 +342,14 @@ Window {
                 }
             }
 
-            // 交互层：点击暂停/继续
+            // 交互层：点击暂停/继续，双击切换置顶
             MouseArea {
                 id: centerMouseArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true // 开启悬停以显示详细 ETA
                 
-                // 支持拖拽窗口
+                // 支持拖拽窗口 (即使在圆环上也能拖拽)
                 property point clickPos
                 property bool isDrag: false
                 
@@ -311,7 +366,7 @@ Window {
                         var dx = mouseX - lastPos.x
                         var dy = mouseY - lastPos.y
                         
-                        // 判断是否发生拖拽（设定 3 像素阈值）
+                        // 判断是否发生拖拽（设定 3 像素阈值），防止误触点击
                         if (!isDrag && (Math.abs(mouseX - clickPos.x) > 3 || Math.abs(mouseY - clickPos.y) > 3)) {
                             isDrag = true
                         }
@@ -337,6 +392,7 @@ Window {
                 }
                 
                 // 单击延迟计时器，用于区分单击和双击
+                // 原理：单击后等待 250ms，如果没有发生双击，则触发单击事件。
                 Timer {
                     id: clickTimer
                     interval: 250 // 标准双击间隔阈值
@@ -349,6 +405,7 @@ Window {
         }
         
         // 2. 状态/数据面板 (独立于 Column，定位在圆圈下方)
+        // 仅在 Normal 模式下显示
         Row {
             id: statusRow
             spacing: 20
@@ -378,8 +435,8 @@ Window {
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
                         onClicked: settingsPopup.open()
+                        // 支持鼠标滚轮直接调节时长
                         onWheel: {
-                            // 滚轮快速调节
                             var delta = wheel.angleDelta.y > 0 ? 1 : -1
                             var newVal = timerEngine.workDurationMinutes + delta
                             if (newVal >= 1 && newVal <= 120) {
@@ -437,7 +494,7 @@ Window {
                         anchors.centerIn: parent
                         spacing: 5
                         
-                        // 自定义简约 Switch
+                        // 自定义简约 Switch 控件
                         Rectangle {
                             width: 36
                             height: 20
@@ -454,6 +511,7 @@ Window {
                                 radius: 8
                                 color: "white"
                                 anchors.verticalCenter: parent.verticalCenter
+                                // 根据开关状态计算 x 坐标
                                 x: appConfig.autoStart ? parent.width - width - 2 : 2
                                 Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
                             }
@@ -469,13 +527,13 @@ Window {
                 }
             }
 
-            // 设置弹窗
+            // 设置弹窗 (Popup)
             Popup {
                 id: settingsPopup
                 anchors.centerIn: parent
                 width: 260
                 height: 230
-                modal: true
+                modal: true // 模态对话框，遮挡背景
                 focus: true
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                 
@@ -502,6 +560,7 @@ Window {
                         spacing: 15
                         anchors.horizontalCenter: parent.horizontalCenter
                         
+                        // 减号按钮
                         Button {
                             width: 40
                             height: 40

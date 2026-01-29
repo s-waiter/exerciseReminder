@@ -1,36 +1,48 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
-import QtQuick.Particles 2.0
+import QtQuick.Particles 2.0 // 引入粒子系统
 import QtGraphicalEffects 1.15
+
+// ========================================================================
+// OverlayWindow.qml - 全屏遮罩提醒窗口
+// ========================================================================
+// 这是倒计时结束时弹出的全屏强制提醒界面。
+// 包含粒子特效、多种视觉主题（圆环、六边形、雷达）和反馈动画。
+// ========================================================================
 
 Window {
     id: overlayWin
     visible: false
     // 强制全屏 + 置顶 + 无边框
+    // Qt.WindowStaysOnTopHint: 确保在所有窗口最上层
     flags: Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
     // visibility: Window.FullScreen // 移除初始的 visibility 设置，避免冲突
     color: "transparent"
 
     // -------------------------------------------------------------------------
-    // 外部接口
+    // 外部接口 (API)
     // -------------------------------------------------------------------------
 
-    // 主题数据 (由外部传入)
+    // 主题数据 (由外部 TimerEngine.cpp 传入)
+    // 包含颜色配置、图标、视觉样式等
     property var themeData: ({})
     
-    // 信号
-    signal reminderFinished()
-    signal snoozeRequested()
+    // 信号 (Signals)：用于通知 C++ 后端
+    signal reminderFinished() // 提醒流程结束（用户点击完成或超时）
+    signal snoozeRequested()  // 用户请求贪睡（暂未实现）
 
+    // 窗口可见性改变时的逻辑
     onVisibleChanged: {
         if(visible) {
             showTime = new Date()
-            showFullScreen()
-            raise()
+            showFullScreen() // 确保全屏
+            raise()          // 提升窗口层级
+            // 重启动画
             mainEntranceAnim.restart()
             bgAnim.restart()
         } else {
+            // 隐藏时重置状态
             feedbackText = ""
         }
     }
@@ -46,6 +58,8 @@ Window {
     property string feedbackText: ""
     property var showTime: null
 
+    // 自动关闭计时器
+    // 当显示反馈结果（如"本次运动完成"）后，3秒后自动关闭窗口
     Timer {
         id: closeTimer
         interval: 3000
@@ -54,13 +68,16 @@ Window {
         }
     }
 
-    // 反馈遮罩层 (全屏模糊背景)
+    // ========================================================================
+    // 反馈遮罩层 (Feedback Layer)
+    // ========================================================================
+    // 当用户完成运动后显示的结算界面
     Rectangle {
         id: feedbackLayer
         anchors.fill: parent
         color: "transparent"
-        visible: overlayWin.feedbackText !== ""
-        z: 999
+        visible: overlayWin.feedbackText !== "" // 只有有反馈文本时才显示
+        z: 999 // 确保最顶层
 
         // 1. 背景模糊与变暗
         Rectangle {
@@ -70,7 +87,7 @@ Window {
             Behavior on opacity { NumberAnimation { duration: 500 } }
         }
 
-        MouseArea { anchors.fill: parent } // 阻止交互
+        MouseArea { anchors.fill: parent } // 阻止交互，强制观看结算动画
 
         // 2. 庆祝粒子系统 (从底部升起的金色气泡)
         ParticleSystem {
@@ -86,7 +103,7 @@ Window {
                     color: currentTheme.gradientEnd
                     opacity: 0.6
                 }
-                fade: true
+                fade: true // 粒子生命周期结束时自动淡出
             }
 
             Emitter {
@@ -97,12 +114,12 @@ Window {
                 lifeSpan: 4000
                 size: 10
                 sizeVariation: 5
-                velocity: PointDirection { y: -200; yVariation: 100 }
+                velocity: PointDirection { y: -200; yVariation: 100 } // 向上飘动
                 acceleration: PointDirection { y: -50 }
             }
         }
 
-        // 3. 核心卡片容器
+        // 3. 核心卡片容器 (结算信息)
         Item {
             id: resultCard
             width: 420
@@ -127,7 +144,7 @@ Window {
             opacity: feedbackLayer.visible ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: 400 } }
 
-            // 卡片背景 (玻璃拟态)
+            // 卡片背景 (玻璃拟态 Glassmorphism)
             Rectangle {
                 id: cardBg
                 anchors.fill: parent
@@ -183,7 +200,7 @@ Window {
                         }
                     }
                     
-                    // 进度圆环 (Canvas 绘制)
+                    // 进度圆环 (Canvas 绘制 - 绘制一个闭合的圆)
                     Canvas {
                         id: progressCanvas
                         anchors.fill: parent
@@ -197,6 +214,7 @@ Window {
                             var ctx = getContext("2d");
                             ctx.clearRect(0, 0, width, height);
                             ctx.beginPath();
+                            // 动态绘制圆弧
                             ctx.arc(width/2, height/2, width/2 - 8, -Math.PI/2, -Math.PI/2 + angle, false);
                             ctx.lineWidth = 8;
                             ctx.lineCap = "round";
@@ -204,7 +222,7 @@ Window {
                             ctx.stroke();
                         }
                         
-                        // 动画驱动
+                        // 动画驱动：从 0 到 360 度 (2*PI)
                         SequentialAnimation on angle {
                             running: feedbackLayer.visible
                             PauseAnimation { duration: 300 }
@@ -212,7 +230,7 @@ Window {
                         }
                     }
                     
-                    // 中心对勾
+                    // 中心对勾 (Checkmark)
                     Text {
                         anchors.centerIn: parent
                         text: "✔"
@@ -220,6 +238,7 @@ Window {
                         font.pixelSize: 60
                         scale: 0
                         
+                        // 弹跳动画
                         SequentialAnimation on scale {
                             running: feedbackLayer.visible
                             PauseAnimation { duration: 800 } // 等圆环画完一半再出来
@@ -294,6 +313,7 @@ Window {
                         anchors.centerIn: parent
                     }
                     
+                    // 进度条
                     Rectangle {
                         anchors.bottom: parent.bottom
                         width: parent.width * (3000 - closeTimerCountdown.elapsed) / 3000
@@ -316,6 +336,9 @@ Window {
         }
     }
 
+    // ========================================================================
+    // 提醒主背景 (Reminder Background)
+    // ========================================================================
     // 1. 动态渐变背景
     Rectangle {
         id: bg
@@ -333,6 +356,7 @@ Window {
             }
         }
         
+        // 背景呼吸效果
         SequentialAnimation on opacity {
             id: bgAnim
             loops: Animation.Infinite
@@ -349,7 +373,7 @@ Window {
         }
     }
 
-    // 2. 粒子系统
+    // 2. 粒子系统 (Ambient Particles)
     ParticleSystem {
         id: particles
         anchors.fill: parent
@@ -388,7 +412,7 @@ Window {
         }
     }
 
-    // 3. 核心内容区
+    // 3. 核心内容区 (Loader 动态加载不同主题)
     Item {
         id: contentCard
         width: 600
@@ -398,6 +422,7 @@ Window {
         opacity: 0
         z: 1 
         
+        // 进场动画
         ParallelAnimation {
             id: mainEntranceAnim
             NumberAnimation {
@@ -501,7 +526,7 @@ Window {
                             var ctx = getContext("2d")
                             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"
                             ctx.lineWidth = 2
-                            ctx.setLineDash([15, 30])
+                            ctx.setLineDash([15, 30]) // 虚线样式
                             ctx.beginPath()
                             ctx.arc(width/2, height/2, width/2-25, 0, 2*Math.PI)
                             ctx.stroke()
@@ -539,6 +564,7 @@ Window {
                         ctx.strokeStyle = "rgba(255, 255, 255, 0.6)"
                         ctx.lineWidth = 4
                         ctx.beginPath()
+                        // 绘制六边形
                         for(var i=0; i<6; i++) {
                             var ang = (rot + i * 60) * Math.PI / 180
                             var x = cx + r * Math.cos(ang)
