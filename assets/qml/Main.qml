@@ -150,28 +150,11 @@ Window {
             // 按钮容器，用于在不同模式下调整位置
             Row {
                 anchors.right: parent.right
-                anchors.rightMargin: isPinned ? (parent.width - width) / 2 : 15 // 迷你模式居中，正常模式靠右
+                anchors.rightMargin: 15
                 anchors.top: parent.top
                 anchors.topMargin: 10
                 spacing: 5
                 
-                // 置顶按钮
-                Button {
-                    id: pinBtn
-                    width: 30
-                    height: 30
-                    hoverEnabled: true
-                    background: Rectangle { color: "transparent" }
-                    contentItem: Text {
-                        text: "📌"
-                        color: mainWindow.isPinned ? mainWindow.themeColor : "#8899A6"
-                        font.pixelSize: 16
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                    onClicked: mainWindow.isPinned = !mainWindow.isPinned
-                }
-
                 // 关闭/隐藏按钮
                 Button {
                     id: closeBtn
