@@ -65,10 +65,10 @@ Window {
     property string sessionTimeRange: ""
 
     // 自动关闭计时器
-    // 当显示反馈结果（如"本次运动完成"）后，5秒后自动关闭窗口
+    // 当显示反馈结果（如"本次运动完成"）后，3秒后自动关闭窗口
     Timer {
         id: closeTimer
-        interval: 5000
+        interval: 3000
         onTriggered: {
             overlayWin.reminderFinished()
         }
@@ -524,8 +524,8 @@ Window {
                     // 进度条
                     Rectangle {
                         anchors.bottom: parent.bottom
-                        // 使用 5000ms (5秒) 作为新的展示时长
-                        width: parent.width * (5000 - closeTimerCountdown.elapsed) / 5000
+                        // 使用 3000ms (3秒) 作为新的展示时长
+                        width: parent.width * (3000 - closeTimerCountdown.elapsed) / 3000
                         height: 2
                         color: currentTheme.gradientEnd
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -536,7 +536,7 @@ Window {
                             property int elapsed: 0
                             NumberAnimation on elapsed {
                                 running: feedbackLayer.visible
-                                from: 0; to: 5000; duration: 5000
+                                from: 0; to: 3000; duration: 3000
                             }
                         }
                     }
