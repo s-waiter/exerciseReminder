@@ -16,6 +16,12 @@ Window {
     property bool isPinned: false
     flags: Qt.FramelessWindowHint | Qt.Window
 
+    // 窗口几何属性动画：确保窗口变形和位移同步，实现平滑过渡
+    Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+    Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+    Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+    Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+
     // 动态主题色逻辑
     property color themeColor: {
         switch(timerEngine.statusText) {
@@ -27,6 +33,22 @@ Window {
     
     onIsPinnedChanged: {
         windowUtils.setTopMost(mainWindow, isPinned)
+        
+        // 视觉位置补偿逻辑：
+        // 当切换模式时，调整窗口坐标，使得倒计时圆圈在屏幕上的绝对位置保持不变，消除视觉抖动。
+        // 计算依据：
+        // 1. 水平方向：Normal宽360(中心180) -> Mini宽260(中心130)。差值 50。
+        //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 50。
+        // 2. 垂直方向：Normal TopMargin 70 -> Mini TopMargin 20。差值 50。
+        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 50。
+        
+        if (isPinned) {
+            mainWindow.x += 50
+            mainWindow.y += 50
+        } else {
+            mainWindow.x -= 50
+            mainWindow.y -= 50
+        }
     }
     
     // 拖拽窗口逻辑
@@ -170,172 +192,185 @@ Window {
         }
 
         // 核心内容区
-        Column {
-            anchors.centerIn: parent
-            spacing: 30
+        
+        // 1. 环形进度条 + 时间显示 (独立于 Column，固定位置)
+        Item {
+            id: circleItem
+            width: 220
+            height: 220
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            // Normal模式下下移 70px 以避开标题栏，Mini模式下仅保留 20px 边距居中
+            // 配合 onIsPinnedChanged 中的窗口坐标补偿，实现视觉位置静止
+            anchors.topMargin: isPinned ? 20 : 70
             
-            // 1. 环形进度条 + 时间显示
-            Item {
-                width: 220
-                height: 220
-                anchors.horizontalCenter: parent.horizontalCenter
+            // 关键：Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
+            // 这样 WindowY(t) + TopMargin(t) = Constant，从而消除视觉抖动
+            Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+            
+            // 外圈轨道
+            Rectangle {
+                anchors.fill: parent
+                radius: width/2
+                color: "transparent"
+                border.color: "#33ffffff"
+                border.width: 4
+            }
+
+            // 进度圆环 (Canvas 绘制)
+            Canvas {
+                id: progressCanvas
+                anchors.fill: parent
+                rotation: -90 // 从12点方向开始
                 
-                // 外圈轨道
-                Rectangle {
-                    anchors.fill: parent
-                    radius: width/2
-                    color: "transparent"
-                    border.color: "#33ffffff"
-                    border.width: 4
-                }
+                // 绑定属性以便重绘
+                property double progress: timerEngine.remainingSeconds / (45 * 60.0)
+                property color drawColor: mainWindow.themeColor
+                onProgressChanged: requestPaint()
+                onDrawColorChanged: requestPaint()
 
-                // 进度圆环 (Canvas 绘制)
-                Canvas {
-                    id: progressCanvas
-                    anchors.fill: parent
-                    rotation: -90 // 从12点方向开始
+                onPaint: {
+                    var ctx = getContext("2d");
+                    var centerX = width / 2;
+                    var centerY = height / 2;
+                    var radius = width / 2 - 4; // 减去边框宽度
                     
-                    // 绑定属性以便重绘
-                    property double progress: timerEngine.remainingSeconds / (45 * 60.0)
-                    property color drawColor: mainWindow.themeColor
-                    onProgressChanged: requestPaint()
-                    onDrawColorChanged: requestPaint()
-
-                    onPaint: {
-                        var ctx = getContext("2d");
-                        var centerX = width / 2;
-                        var centerY = height / 2;
-                        var radius = width / 2 - 4; // 减去边框宽度
-                        
-                        ctx.clearRect(0, 0, width, height);
-                        
-                        // 绘制进度弧
-                        ctx.beginPath();
-                        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
-                        ctx.lineWidth = 8;
-                        ctx.lineCap = "round";
-                        
-                        // 渐变色画笔
-                        var gradient = ctx.createLinearGradient(0, 0, width, height);
-                        gradient.addColorStop(0, drawColor); // 主色
-                        gradient.addColorStop(1, "#3a7bd5"); // 蓝色 (可以保持蓝色基调，或者也跟随变化？跟随变化更好)
-                        // 让尾部稍微偏蓝一点，保持科技感
-                        if (drawColor == "#ffbf00") {
-                             gradient.addColorStop(1, "#ff9100"); // 琥珀色的渐变尾
-                        } else if (drawColor == "#00ff88") {
-                             gradient.addColorStop(1, "#00bfa5"); // 绿色的渐变尾
-                        }
-                        
-                        ctx.strokeStyle = gradient;
-                        
-                        ctx.stroke();
-                    }
-                }
-                
-                // 中心时间文字
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 5
+                    ctx.clearRect(0, 0, width, height);
                     
-                    Text {
-                        property int mins: Math.floor(timerEngine.remainingSeconds / 60)
-                        property int secs: timerEngine.remainingSeconds % 60
-                        // 补零格式化
-                        text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
-                        color: "#ffffff"
-                        font.pixelSize: 48
-                        font.family: "Segoe UI Light" // 细体字更有科技感
-                        font.weight: Font.Light
-                        anchors.horizontalCenter: parent.horizontalCenter
+                    // 绘制进度弧
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
+                    ctx.lineWidth = 8;
+                    ctx.lineCap = "round";
+                    
+                    // 渐变色画笔
+                    var gradient = ctx.createLinearGradient(0, 0, width, height);
+                    gradient.addColorStop(0, drawColor); // 主色
+                    gradient.addColorStop(1, "#3a7bd5"); // 蓝色 (可以保持蓝色基调，或者也跟随变化？跟随变化更好)
+                    // 让尾部稍微偏蓝一点，保持科技感
+                    if (drawColor == "#ffbf00") {
+                            gradient.addColorStop(1, "#ff9100"); // 琥珀色的渐变尾
+                    } else if (drawColor == "#00ff88") {
+                            gradient.addColorStop(1, "#00bfa5"); // 绿色的渐变尾
                     }
                     
-                    Text {
-                        text: timerEngine.statusText
-                        color: mainWindow.themeColor
-                        font.pixelSize: 14
-                        font.bold: true
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        opacity: 0.8
-                    }
-
-                    // 预计结束时间 (ETA)
-                    Text {
-                        text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
-                        color: "#8899A6" // 弱化显示
-                        font.pixelSize: 12
-                        visible: timerEngine.statusText === "工作中"
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        opacity: 0.6
-                    }
-                }
-
-                // 交互层：点击暂停/继续
-                MouseArea {
-                    id: centerMouseArea
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    hoverEnabled: true // 开启悬停以显示详细 ETA
+                    ctx.strokeStyle = gradient;
                     
-                    // 支持拖拽窗口
-                    property point clickPos
-                    property bool isDrag: false
-                    
-                    onPressed: {
-                        clickPos = Qt.point(mouseX, mouseY)
-                        isDrag = false
-                        // lastPos 用于计算位移增量
-                        lastPos = Qt.point(mouseX, mouseY)
-                    }
-                    
-                    property point lastPos
-                    onPositionChanged: {
-                        if(pressed) {
-                            var dx = mouseX - lastPos.x
-                            var dy = mouseY - lastPos.y
-                            
-                            // 判断是否发生拖拽（设定 3 像素阈值）
-                            if (!isDrag && (Math.abs(mouseX - clickPos.x) > 3 || Math.abs(mouseY - clickPos.y) > 3)) {
-                                isDrag = true
-                            }
-                            
-                            mainWindow.x += dx
-                            mainWindow.y += dy
-                        }
-                    }
-                    
-                    onClicked: {
-                        // 只有在非拖拽情况下才触发暂停
-                        if (!isDrag) {
-                            clickTimer.start()
-                        }
-                    }
-                    
-                    onDoubleClicked: {
-                        // 双击切换置顶状态
-                        if (!isDrag) {
-                            clickTimer.stop() // 停止单击计时器，防止触发暂停
-                            mainWindow.isPinned = !mainWindow.isPinned
-                        }
-                    }
-                    
-                    // 单击延迟计时器，用于区分单击和双击
-                    Timer {
-                        id: clickTimer
-                        interval: 250 // 标准双击间隔阈值
-                        repeat: false
-                        onTriggered: {
-                            timerEngine.togglePause()
-                        }
-                    }
+                    ctx.stroke();
                 }
             }
             
-            // 2. 状态/数据面板
-            Row {
-                spacing: 20
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: !mainWindow.isPinned
-                height: visible ? implicitHeight : 0 // 确保隐藏时不占位
+            // 中心时间文字
+            Column {
+                anchors.centerIn: parent
+                spacing: 5
+                
+                Text {
+                    property int mins: Math.floor(timerEngine.remainingSeconds / 60)
+                    property int secs: timerEngine.remainingSeconds % 60
+                    // 补零格式化
+                    text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
+                    color: "#ffffff"
+                    font.pixelSize: 48
+                    font.family: "Segoe UI Light" // 细体字更有科技感
+                    font.weight: Font.Light
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                
+                Text {
+                    text: timerEngine.statusText
+                    color: mainWindow.themeColor
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    opacity: 0.8
+                }
+
+                // 预计结束时间 (ETA)
+                Text {
+                    text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
+                    color: "#8899A6" // 弱化显示
+                    font.pixelSize: 12
+                    // 使用 opacity 控制显示，避免 visible 导致的布局抖动
+                    opacity: timerEngine.statusText === "工作中" ? 0.6 : 0.0
+                    visible: true 
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    
+                    // 平滑过渡
+                    Behavior on opacity { NumberAnimation { duration: 200 } }
+                }
+            }
+
+            // 交互层：点击暂停/继续
+            MouseArea {
+                id: centerMouseArea
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true // 开启悬停以显示详细 ETA
+                
+                // 支持拖拽窗口
+                property point clickPos
+                property bool isDrag: false
+                
+                onPressed: {
+                    clickPos = Qt.point(mouseX, mouseY)
+                    isDrag = false
+                    // lastPos 用于计算位移增量
+                    lastPos = Qt.point(mouseX, mouseY)
+                }
+                
+                property point lastPos
+                onPositionChanged: {
+                    if(pressed) {
+                        var dx = mouseX - lastPos.x
+                        var dy = mouseY - lastPos.y
+                        
+                        // 判断是否发生拖拽（设定 3 像素阈值）
+                        if (!isDrag && (Math.abs(mouseX - clickPos.x) > 3 || Math.abs(mouseY - clickPos.y) > 3)) {
+                            isDrag = true
+                        }
+                        
+                        mainWindow.x += dx
+                        mainWindow.y += dy
+                    }
+                }
+                
+                onClicked: {
+                    // 只有在非拖拽情况下才触发暂停
+                    if (!isDrag) {
+                        clickTimer.start()
+                    }
+                }
+                
+                onDoubleClicked: {
+                    // 双击切换置顶状态
+                    if (!isDrag) {
+                        clickTimer.stop() // 停止单击计时器，防止触发暂停
+                        mainWindow.isPinned = !mainWindow.isPinned
+                    }
+                }
+                
+                // 单击延迟计时器，用于区分单击和双击
+                Timer {
+                    id: clickTimer
+                    interval: 250 // 标准双击间隔阈值
+                    repeat: false
+                    onTriggered: {
+                        timerEngine.togglePause()
+                    }
+                }
+            }
+        }
+        
+        // 2. 状态/数据面板 (独立于 Column，定位在圆圈下方)
+        Row {
+            id: statusRow
+            spacing: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: circleItem.bottom
+            anchors.topMargin: 30
+            visible: !mainWindow.isPinned
+            height: visible ? implicitHeight : 0 // 确保隐藏时不占位
                 
                 // 间隔设置卡片
                 Rectangle {
@@ -557,6 +592,8 @@ Window {
             Row {
                 spacing: 15
                 anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: statusRow.bottom
+                anchors.topMargin: 30
                 visible: !mainWindow.isPinned
                 height: visible ? implicitHeight : 0
                 
@@ -607,7 +644,6 @@ Window {
                 }
             }
         }
-    }
     }
 
     // 主题控制器
