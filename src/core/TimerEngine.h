@@ -16,6 +16,9 @@ class TimerEngine : public QObject
     // 暴露给QML的属性：预计完成时间 (HH:mm)
     Q_PROPERTY(QString estimatedFinishTime READ estimatedFinishTime NOTIFY timeUpdated)
 
+    // 暴露给QML的属性：当前会话总时长（秒），用于计算进度条
+    Q_PROPERTY(int currentSessionTotalTime READ currentSessionTotalTime NOTIFY currentSessionTotalTimeChanged)
+
 public:
     explicit TimerEngine(QObject *parent = nullptr);
 
@@ -23,6 +26,7 @@ public:
     QString statusText() const;
     int workDurationMinutes() const;
     QString estimatedFinishTime() const;
+    int currentSessionTotalTime() const;
 
 public slots:
     // 设置工作间隔（分钟）
@@ -45,6 +49,8 @@ signals:
     void reminderTriggered();
     // 工作间隔变更信号
     void workDurationMinutesChanged();
+    // 当前会话总时长变更信号
+    void currentSessionTotalTimeChanged();
     // 休息结束信号，带有时长（秒）
     void breakFinished(int durationSeconds);
 
@@ -55,6 +61,7 @@ private:
     QTimer *m_timer;
     int m_remainingSecs;
     int m_workDuration; // 单位：秒
+    int m_currentSessionTotal; // 当前会话的总时长，用于进度条计算
     const int m_snoozeDuration = 5 * 60; // 5分钟
     QString m_status;
     QDateTime m_breakStartTime; // 休息开始时间

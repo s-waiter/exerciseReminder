@@ -5,6 +5,7 @@ TimerEngine::TimerEngine(QObject *parent)
     : QObject(parent)
     , m_workDuration(45 * 60) // 默认45分钟
     , m_remainingSecs(45 * 60)
+    , m_currentSessionTotal(45 * 60)
 {
     m_timer = new QTimer(this);
     m_timer->setInterval(1000); // 1秒间隔
@@ -22,6 +23,10 @@ QString TimerEngine::statusText() const { return m_status; }
 
 int TimerEngine::workDurationMinutes() const {
     return m_workDuration / 60;
+}
+
+int TimerEngine::currentSessionTotalTime() const {
+    return m_currentSessionTotal;
 }
 
 QString TimerEngine::estimatedFinishTime() const {
@@ -56,6 +61,9 @@ void TimerEngine::startWork() {
     }
 
     m_remainingSecs = m_workDuration;
+    m_currentSessionTotal = m_workDuration; // 记录本次会话总时长
+    emit currentSessionTotalTimeChanged();
+    
     m_status = "工作中";
     emit statusChanged();
     emit timeUpdated();
@@ -68,6 +76,9 @@ void TimerEngine::startWork() {
 
 void TimerEngine::snooze() {
     m_remainingSecs = m_snoozeDuration;
+    m_currentSessionTotal = m_snoozeDuration; // 贪睡模式总时长
+    emit currentSessionTotalTimeChanged();
+    
     m_status = "稍后提醒";
     emit statusChanged();
     emit timeUpdated();

@@ -207,7 +207,10 @@ Window {
                 rotation: -90 // 从12点方向开始
                 
                 // 绑定属性以便重绘
-                property double progress: timerEngine.remainingSeconds / (45 * 60.0)
+                property double progress: {
+                    var total = timerEngine.currentSessionTotalTime
+                    return total > 0 ? timerEngine.remainingSeconds / total : 0
+                }
                 property color drawColor: mainWindow.themeColor
                 onProgressChanged: requestPaint()
                 onDrawColorChanged: requestPaint()
