@@ -2,22 +2,18 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtQml 2.15 // for Instantiator
-import QtGraphicalEffects 1.15 // 需要在 pro 中添加 QT += graphicaleffects (如果是动态编译) 或者直接使用
-
-// 注意：如果 GraphicalEffects 不可用，可以移除相关效果。
-// 为了确保兼容性，这里尽量使用基础图形或 Canvas。
+import QtGraphicalEffects 1.15
 
 Window {
     id: mainWindow
-    width: 360
-    height: 520
+    width: isPinned ? 260 : 360
+    height: isPinned ? 260 : 520
     visible: true
     title: "久坐提醒助手"
-    color: "transparent" // 透明背景，为了自定义圆角或异形窗口（如果 flag 允许）
+    color: "transparent"
     
     // 窗口标志：去除默认标题栏，自定义边框
     property bool isPinned: false
-    // 移除 Qt.WindowStaysOnTopHint 的绑定，改用 C++ 手动控制
     flags: Qt.FramelessWindowHint | Qt.Window
     
     onIsPinnedChanged: {
@@ -26,7 +22,9 @@ Window {
     
     // 拖拽窗口逻辑
     MouseArea {
+        id: windowMouseArea
         anchors.fill: parent
+        hoverEnabled: true // 启用悬停检测，用于迷你模式显示控件
         property point lastMousePos: Qt.point(0, 0)
         onPressed: { lastMousePos = Qt.point(mouseX, mouseY); }
         onPositionChanged: {
@@ -43,7 +41,7 @@ Window {
     Rectangle {
         id: bgRect
         anchors.fill: parent
-        radius: 20
+        radius: isPinned ? width / 2 : 20
         clip: true
         
         // 高科技感渐变背景
@@ -73,9 +71,14 @@ Window {
         Item {
             id: titleBar
             width: parent.width
-            height: 50
+            height: isPinned ? 40 : 50
             anchors.top: parent.top
+            z: 10 
             
+            // 迷你模式下自动隐藏/显示
+            opacity: isPinned ? (windowMouseArea.containsMouse ? 1.0 : 0.0) : 1.0
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+
             Text {
                 text: "久坐提醒助手"
                 color: "#8899A6"
@@ -83,47 +86,52 @@ Window {
                 font.letterSpacing: 2
                 font.bold: true
                 anchors.centerIn: parent
+                visible: !mainWindow.isPinned
             }
 
-            // 置顶按钮
-            Button {
-                width: 30
-                height: 30
-                anchors.right: closeBtn.left
-                anchors.rightMargin: 5
-                anchors.verticalCenter: parent.verticalCenter
-                background: Rectangle { color: "transparent" }
-                contentItem: Text {
-                    text: "📌"
-                    color: mainWindow.isPinned ? "#00d2ff" : "#8899A6"
-                    font.pixelSize: 16
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                onClicked: mainWindow.isPinned = !mainWindow.isPinned
-                
-                // 提示工具 (ToolTip)
-                ToolTip.visible: hovered
-                ToolTip.text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
-            }
-
-            // 关闭/隐藏按钮
-            Button {
-                id: closeBtn
-                width: 30
-                height: 30
+            // 按钮容器，用于在不同模式下调整位置
+            Row {
                 anchors.right: parent.right
-                anchors.rightMargin: 15
-                anchors.verticalCenter: parent.verticalCenter
-                background: Rectangle { color: "transparent" }
-                contentItem: Text {
-                    text: "×"
-                    color: "white"
-                    font.pixelSize: 24
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                anchors.rightMargin: isPinned ? (parent.width - width) / 2 : 15 // 迷你模式居中，正常模式靠右
+                anchors.top: parent.top
+                anchors.topMargin: 10
+                spacing: 5
+                
+                // 置顶按钮
+                Button {
+                    width: 30
+                    height: 30
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Text {
+                        text: "📌"
+                        color: mainWindow.isPinned ? "#00d2ff" : "#8899A6"
+                        font.pixelSize: 16
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: mainWindow.isPinned = !mainWindow.isPinned
+                    
+                    // 提示工具 (ToolTip)
+                    ToolTip.visible: hovered
+                    ToolTip.text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
                 }
-                onClicked: mainWindow.hide()
+
+                // 关闭/隐藏按钮
+                Button {
+                    id: closeBtn
+                    width: 30
+                    height: 30
+                    visible: !mainWindow.isPinned // 迷你模式下隐藏关闭按钮，防止误触，只留取消置顶
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Text {
+                        text: "×"
+                        color: "white"
+                        font.pixelSize: 24
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: mainWindow.hide()
+                }
             }
         }
 
@@ -213,6 +221,8 @@ Window {
             Row {
                 spacing: 20
                 anchors.horizontalCenter: parent.horizontalCenter
+                visible: !mainWindow.isPinned
+                height: visible ? implicitHeight : 0 // 确保隐藏时不占位
                 
                 // 间隔设置卡片
                 Rectangle {
@@ -398,6 +408,8 @@ Window {
             Row {
                 spacing: 15
                 anchors.horizontalCenter: parent.horizontalCenter
+                visible: !mainWindow.isPinned
+                height: visible ? implicitHeight : 0
                 
                 // 自定义按钮组件
                 component CyberButton : Button {
