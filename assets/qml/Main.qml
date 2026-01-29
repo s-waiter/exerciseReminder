@@ -306,6 +306,24 @@ Window {
                     onClicked: {
                         // 只有在非拖拽情况下才触发暂停
                         if (!isDrag) {
+                            clickTimer.start()
+                        }
+                    }
+                    
+                    onDoubleClicked: {
+                        // 双击切换置顶状态
+                        if (!isDrag) {
+                            clickTimer.stop() // 停止单击计时器，防止触发暂停
+                            mainWindow.isPinned = !mainWindow.isPinned
+                        }
+                    }
+                    
+                    // 单击延迟计时器，用于区分单击和双击
+                    Timer {
+                        id: clickTimer
+                        interval: 250 // 标准双击间隔阈值
+                        repeat: false
+                        onTriggered: {
                             timerEngine.togglePause()
                         }
                     }
