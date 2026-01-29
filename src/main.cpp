@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QDebug>
+#include <QIcon>
 #include "core/AppConfig.h"
 #include "core/TimerEngine.h"
 #include "gui/TrayIcon.h"

@@ -11,7 +11,7 @@ Window {
     id: mainWindow
     width: 360
     height: 520
-    visible: false
+    visible: true
     title: "久坐提醒助手"
     color: "transparent" // 透明背景，为了自定义圆角或异形窗口（如果 flag 允许）
     
