@@ -362,6 +362,8 @@ Window {
                     height: 60
                     color: "#1Affffff"
                     radius: 10
+                    border.color: intervalMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
+                    border.width: 1
                     
                     // 悬停缩放效果
                     scale: intervalMouseArea.containsMouse ? 1.05 : 1.0
@@ -381,40 +383,22 @@ Window {
                                 timerEngine.workDurationMinutes = newVal
                             }
                         }
-                        
-                        ToolTip {
-                            id: intervalToolTip
-                            visible: intervalMouseArea.containsMouse
-                            delay: 500
-                            text: "滚轮可快速调节时长\n点击打开详细设置"
-                            
-                            contentItem: Text {
-                                text: intervalToolTip.text
-                                font: intervalToolTip.font
-                                color: "#ffffff"
-                            }
-                            
-                            background: Rectangle {
-                                color: "#141E30"
-                                border.color: mainWindow.themeColor
-                                border.width: 1
-                                radius: 5
-                                opacity: 0.9
-                            }
-                        }
                     }
-                    
+
                     Column {
                         anchors.centerIn: parent
+                        spacing: 2
+                        
                         Text { 
-                            // 安全访问属性，如果未定义(旧C++)则显示默认值
                             property var val: timerEngine.workDurationMinutes
-                            text: (val !== undefined ? val : 45) + " 分钟"
+                            text: (val !== undefined ? val : 45) + " min"
                             color: "white"
                             font.bold: true
-                            font.pixelSize: 14
+                            font.pixelSize: 16
+                            font.family: "Segoe UI"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
+                        
                         Text { 
                             text: "间隔时长"
                             color: "#8899A6"
@@ -424,53 +408,55 @@ Window {
                     }
                 }
                 
-                // 模式显示卡片 (已替换为开机自启)
+                // 开机自启卡片 (极简 Switch 风格)
                 Rectangle {
+                    id: autoStartCard
                     width: 100
                     height: 60
                     color: "#1Affffff"
                     radius: 10
+                    border.color: autoStartMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
+                    border.width: 1
+                    
+                    // 悬停缩放效果
+                    scale: autoStartMouseArea.containsMouse ? 1.05 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+
+                    MouseArea {
+                        id: autoStartMouseArea
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: appConfig.autoStart = !appConfig.autoStart
+                    }
                     
                     Column {
                         anchors.centerIn: parent
-                        spacing: 2
+                        spacing: 5
                         
-                        // 开机自启开关 (缩小版以适应卡片)
-                        Switch {
-                            id: autoStartSwitch
+                        // 自定义简约 Switch
+                        Rectangle {
+                            width: 36
+                            height: 20
+                            radius: 10
+                            color: appConfig.autoStart ? mainWindow.themeColor : "#33ffffff"
                             anchors.horizontalCenter: parent.horizontalCenter
-                            checked: appConfig.autoStart
-                            scale: 0.7 // 缩小比例
-                            height: 30
                             
-                            onCheckedChanged: {
-                                if (appConfig.autoStart !== checked) {
-                                    appConfig.autoStart = checked
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 200 } }
                             
-                            indicator: Rectangle {
-                                implicitWidth: 48
-                                implicitHeight: 26
-                                x: autoStartSwitch.leftPadding
-                                y: parent.height / 2 - height / 2
-                                radius: 13
-                                color: autoStartSwitch.checked ? "#00d2ff" : "#2C3E50"
-                                border.color: autoStartSwitch.checked ? "#00d2ff" : "#cccccc"
-                                
-                                Rectangle {
-                                    x: autoStartSwitch.checked ? parent.width - width - 2 : 2
-                                    y: 2
-                                    width: 22
-                                    height: 22
-                                    radius: 11
-                                    color: "white"
-                                    Behavior on x { NumberAnimation { duration: 100 } }
-                                }
+                            // 滑块
+                            Rectangle {
+                                width: 16
+                                height: 16
+                                radius: 8
+                                color: "white"
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: appConfig.autoStart ? parent.width - width - 2 : 2
+                                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
                             }
                         }
-
-                        Text { 
+                        
+                        Text {
                             text: "开机自启"
                             color: "#8899A6"
                             font.pixelSize: 10
