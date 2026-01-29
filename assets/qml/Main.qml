@@ -342,7 +342,7 @@ Window {
                 }
             }
 
-            // 交互层：点击暂停/继续，双击切换置顶
+            // 交互层：点击暂停/继续，双击切换模式，三击立即休息
             MouseArea {
                 id: centerMouseArea
                 anchors.fill: parent
@@ -353,11 +353,45 @@ Window {
                 property point clickPos
                 property bool isDrag: false
                 
+                // 三击检测相关属性
+                property int clickCount: 0
+                
+                // 1. 点击计数重置计时器 (500ms 无操作则重置计数)
+                Timer {
+                    id: clickCountResetTimer
+                    interval: 500
+                    onTriggered: centerMouseArea.clickCount = 0
+                }
+                
+                // 2. 双击动作延迟计时器 (用于等待可能的第三次点击)
+                Timer {
+                    id: doubleClickActionTimer
+                    interval: 250 // 延迟 250ms 执行双击动作
+                    repeat: false
+                    onTriggered: mainWindow.isPinned = !mainWindow.isPinned
+                }
+                
                 onPressed: {
                     clickPos = Qt.point(mouseX, mouseY)
                     isDrag = false
                     // lastPos 用于计算位移增量
                     lastPos = Qt.point(mouseX, mouseY)
+                    
+                    // === 三击检测逻辑 ===
+                    clickCount++
+                    clickCountResetTimer.restart() // 每次点击刷新重置计时器
+                    
+                    if (clickCount === 3) {
+                        // 检测到三击：
+                        // 1. 阻止即将发生的双击动作 (切换模式)
+                        doubleClickActionTimer.stop()
+                        
+                        // 2. 触发立即休息
+                        themeController.generateRandomTheme()
+                        isReminderActive = true
+                        
+                        // 注意：此处不立即重置 clickCount，以便 onClicked 中能检测到 clickCount >= 3
+                    }
                 }
                 
                 property point lastPos
@@ -369,6 +403,7 @@ Window {
                         // 判断是否发生拖拽（设定 3 像素阈值），防止误触点击
                         if (!isDrag && (Math.abs(mouseX - clickPos.x) > 3 || Math.abs(mouseY - clickPos.y) > 3)) {
                             isDrag = true
+                            clickCount = 0 // 发生拖拽，重置点击计数
                         }
                         
                         mainWindow.x += dx
@@ -377,17 +412,20 @@ Window {
                 }
                 
                 onClicked: {
-                    // 只有在非拖拽情况下才触发暂停
-                    if (!isDrag) {
+                    // 只有在非拖拽且非三击序列中才触发暂停
+                    // 如果 clickCount >= 3，说明是三击操作的一部分，不应触发单击逻辑
+                    if (!isDrag && clickCount < 3) {
                         clickTimer.start()
                     }
                 }
                 
                 onDoubleClicked: {
-                    // 双击切换置顶状态
+                    // 双击切换模式
                     if (!isDrag) {
                         clickTimer.stop() // 停止单击计时器，防止触发暂停
-                        mainWindow.isPinned = !mainWindow.isPinned
+                        
+                        // 不立即切换，而是启动延迟计时器，给三击留出判断时间
+                        doubleClickActionTimer.start()
                     }
                 }
                 
