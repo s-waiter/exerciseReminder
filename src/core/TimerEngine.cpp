@@ -1,5 +1,9 @@
 #include "TimerEngine.h"
 #include <QDebug>
+#include <QSettings>
+#include <QDate>
+#include <QVariant>
+#include <QLocale>
 
 // 构造函数
 TimerEngine::TimerEngine(QObject *parent) 
@@ -140,6 +144,61 @@ void TimerEngine::togglePause() {
             startWork();
         }
     }
+}
+
+// ========================================================================
+// 数据统计相关实现
+// ========================================================================
+
+// 记录一次运动时长
+void TimerEngine::recordExercise(int durationSeconds) {
+    if (durationSeconds <= 0) return;
+
+    QSettings settings("ExerciseReminder", "Stats");
+    QString today = QDate::currentDate().toString("yyyy-MM-dd");
+    
+    // 读取今日已有的时长
+    int current = settings.value(today, 0).toInt();
+    
+    // 累加并保存
+    settings.setValue(today, current + durationSeconds);
+    
+    // 强制同步以确保写入磁盘
+    settings.sync();
+    
+    qDebug() << "Recorded exercise:" << durationSeconds << "s. Today total:" << (current + durationSeconds);
+}
+
+int TimerEngine::getTodayExerciseSeconds() {
+    QSettings settings("ExerciseReminder", "Stats");
+    QString today = QDate::currentDate().toString("yyyy-MM-dd");
+    return settings.value(today, 0).toInt();
+}
+
+QVariantList TimerEngine::getWeeklyExerciseStats() {
+    QSettings settings("ExerciseReminder", "Stats");
+    QVariantList list;
+    QDate today = QDate::currentDate();
+    
+    // 获取过去7天的数据 (包括今天)
+    for (int i = 6; i >= 0; --i) {
+        QDate date = today.addDays(-i);
+        QString key = date.toString("yyyy-MM-dd");
+        
+        int seconds = settings.value(key, 0).toInt();
+        
+        QVariantMap map;
+        map["date"] = date.toString("MM/dd");
+        // 获取星期几的短名称 (如 "周一", "Mon")
+        map["day"] = QLocale().dayName(date.dayOfWeek(), QLocale::ShortFormat);
+        map["seconds"] = seconds;
+        
+        // 标记是否是今天，方便前端高亮
+        map["isToday"] = (i == 0);
+        
+        list.append(map);
+    }
+    return list;
 }
 
 // 定时器回调函数 (每秒执行一次)

@@ -57,12 +57,17 @@ Window {
     // 0. 反馈状态
     property string feedbackText: ""
     property var showTime: null
+    
+    // 新增统计数据属性
+    property int todayTotalSeconds: 0
+    property var weeklyStats: []
+    property string sessionTimeRange: ""
 
     // 自动关闭计时器
-    // 当显示反馈结果（如"本次运动完成"）后，3秒后自动关闭窗口
+    // 当显示反馈结果（如"本次运动完成"）后，5秒后自动关闭窗口
     Timer {
         id: closeTimer
-        interval: 3000
+        interval: 5000
         onTriggered: {
             overlayWin.reminderFinished()
         }
@@ -248,53 +253,142 @@ Window {
                     }
                 }
                 
-                // B. 文字信息
+                // B. 统计信息区域 (替代原来的简单文字)
                 Column {
-                    spacing: 8
+                    spacing: 15
                     anchors.horizontalCenter: parent.horizontalCenter
                     
-                    Text {
-                        text: "本次运动完成"
-                        color: "#88ffffff"
-                        font.pixelSize: 12
-                        font.letterSpacing: 3
-                        font.bold: true
+                    // 1. 本次运动概览
+                    Column {
+                        spacing: 5
                         anchors.horizontalCenter: parent.horizontalCenter
-                        opacity: 0
-                        SequentialAnimation on opacity {
-                            running: feedbackLayer.visible
-                            PauseAnimation { duration: 500 }
-                            NumberAnimation { to: 1; duration: 500 }
+                        
+                        Text {
+                            text: overlayWin.feedbackText
+                            color: "white"
+                            font.pixelSize: 24
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            
+                            // 简单的出现动画
+                            opacity: 0
+                            NumberAnimation on opacity {
+                                running: feedbackLayer.visible
+                                from: 0; to: 1; duration: 500
+                            }
+                        }
+                        
+                        Text {
+                            text: "时间段: " + overlayWin.sessionTimeRange
+                            color: "#aaffffff"
+                            font.pixelSize: 14
+                            horizontalAlignment: Text.AlignHCenter
+                            visible: overlayWin.sessionTimeRange !== ""
                         }
                     }
                     
+                    // 2. 分隔线
+                    Rectangle {
+                        width: 100
+                        height: 1
+                        color: "#33ffffff"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    // 3. 今日累计
                     Text {
-                        id: timeTextDisplay // 添加 ID 以供动画引用
-                        // 从 "本次运动时长: XX 分 XX 秒" 解析出 "XX:XX" 或保留原样但大号显示
-                        // 这里我们做个简单的解析优化，让数字更大
-                        property string rawText: overlayWin.feedbackText
-                        text: rawText.replace("本次运动时长: ", "")
-                        
-                        color: "white"
-                        font.pixelSize: 48
-                        font.weight: Font.Bold
-                        font.family: "Segoe UI" // Windows 友好字体
+                        text: {
+                            var total = overlayWin.todayTotalSeconds
+                            var h = Math.floor(total / 3600)
+                            var m = Math.floor((total % 3600) / 60)
+                            return "今日累计运动: " + (h > 0 ? h + "小时 " : "") + m + "分钟"
+                        }
+                        color: currentTheme.gradientEnd // 使用主题色高亮
+                        font.pixelSize: 16
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    
+                    // 4. 近7天趋势图表
+                    Item {
+                        width: 320
+                        height: 120
                         anchors.horizontalCenter: parent.horizontalCenter
                         
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            horizontalOffset: 0; verticalOffset: 0
-                            radius: 10; samples: 17; color: currentTheme.gradientEnd
+                        // 图表背景
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#11ffffff"
+                            radius: 10
                         }
                         
-                        scale: 0.8
-                        opacity: 0
-                        SequentialAnimation {
-                            running: feedbackLayer.visible
-                            PauseAnimation { duration: 600 }
-                            ParallelAnimation {
-                                NumberAnimation { target: timeTextDisplay; property: "opacity"; to: 1; duration: 500 }
-                                NumberAnimation { target: timeTextDisplay; property: "scale"; to: 1; duration: 500; easing.type: Easing.OutBack }
+                        // 标题
+                        Text {
+                            text: "近7天运动趋势"
+                            color: "#66ffffff"
+                            font.pixelSize: 10
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.margins: 8
+                        }
+                        
+                        Row {
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: 5
+                            spacing: 15
+                            
+                            Repeater {
+                                model: overlayWin.weeklyStats
+                                delegate: Column {
+                                    spacing: 5
+                                    property real maxVal: {
+                                        var m = 60 // 默认最小基准
+                                        for(var i=0; i<overlayWin.weeklyStats.length; i++) {
+                                            if(overlayWin.weeklyStats[i].seconds > m) m = overlayWin.weeklyStats[i].seconds
+                                        }
+                                        return m
+                                    }
+                                    
+                                    property real barH: (modelData.seconds / maxVal) * 60
+                                    
+                                    // 柱状条容器
+                                    Rectangle {
+                                        width: 20
+                                        height: 60 
+                                        color: "transparent"
+                                        
+                                        // 实际的柱子 (底部对齐)
+                                        Rectangle {
+                                            width: parent.width
+                                            height: Math.max(2, barH) // 至少2px高度
+                                            color: modelData.isToday ? currentTheme.gradientEnd : "#44ffffff"
+                                            radius: 2
+                                            anchors.bottom: parent.bottom
+                                            
+                                            // 动画: 每次显示时重启动画
+                                            property bool isVisible: feedbackLayer.visible
+                                            onIsVisibleChanged: {
+                                                if(isVisible) {
+                                                    heightAnimation.restart()
+                                                }
+                                            }
+                                            
+                                            NumberAnimation on height {
+                                                id: heightAnimation
+                                                from: 0; to: Math.max(2, barH)
+                                                duration: 800; easing.type: Easing.OutBack 
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 日期
+                                    Text {
+                                        text: modelData.date
+                                        color: modelData.isToday ? "white" : "#66ffffff"
+                                        font.pixelSize: 10
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+                                }
                             }
                         }
                     }
@@ -316,7 +410,8 @@ Window {
                     // 进度条
                     Rectangle {
                         anchors.bottom: parent.bottom
-                        width: parent.width * (3000 - closeTimerCountdown.elapsed) / 3000
+                        // 使用 5000ms (5秒) 作为新的展示时长
+                        width: parent.width * (5000 - closeTimerCountdown.elapsed) / 5000
                         height: 2
                         color: currentTheme.gradientEnd
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -327,7 +422,7 @@ Window {
                             property int elapsed: 0
                             NumberAnimation on elapsed {
                                 running: feedbackLayer.visible
-                                from: 0; to: 3000; duration: 3000
+                                from: 0; to: 5000; duration: 5000
                             }
                         }
                     }
@@ -784,19 +879,27 @@ Window {
                     durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
                 }
                 
+                // 2. 记录数据到后端并获取最新统计
+                timerEngine.recordExercise(durationSeconds)
+                overlayWin.todayTotalSeconds = timerEngine.getTodayExerciseSeconds()
+                overlayWin.weeklyStats = timerEngine.getWeeklyExerciseStats()
+
+                // 3. 格式化文本
                 var mins = Math.floor(durationSeconds / 60)
                 var secs = durationSeconds % 60
                 var timeStr = ""
                 if(mins > 0) timeStr += mins + " 分 "
                 timeStr += secs + " 秒"
                 
-                overlayWin.feedbackText = "本次运动时长: " + timeStr
+                overlayWin.feedbackText = "本次运动: " + timeStr
                 
-                // 2. 显示反馈并准备关闭
+                // 格式化时间段: HH:mm - HH:mm
+                var startStr = Qt.formatTime(overlayWin.showTime, "HH:mm")
+                var endStr = Qt.formatTime(now, "HH:mm")
+                overlayWin.sessionTimeRange = startStr + " - " + endStr
+                
+                // 4. 显示反馈并准备关闭
                 closeTimer.restart()
-                
-                // 3. 通知后端重置计时器
-                timerEngine.startWork()
             }
         }
         

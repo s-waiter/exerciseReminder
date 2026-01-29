@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QDateTime>
+#include <QVariant> // 添加 QVariant 头文件以支持 QVariantList
 
 // ========================================================================
 // TimerEngine 类：核心业务逻辑引擎
@@ -78,6 +79,18 @@ public slots:
     
     // 切换暂停/继续状态 (供 QML 按钮点击调用)
     Q_INVOKABLE void togglePause();
+
+    // ========================================================================
+    // 数据统计相关 (新增)
+    // ========================================================================
+    // 记录一次运动 (时长单位: 秒)
+    Q_INVOKABLE void recordExercise(int durationSeconds);
+    
+    // 获取今日累计运动时长 (秒)
+    Q_INVOKABLE int getTodayExerciseSeconds();
+    
+    // 获取过去7天的运动统计数据 (返回 [{date: "MM-dd", day: "Mon", seconds: 120}, ...])
+    Q_INVOKABLE QVariantList getWeeklyExerciseStats();
 
 // ========================================================================
 // Signals (信号)
