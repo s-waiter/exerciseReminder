@@ -288,7 +288,7 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     
                     Text {
-                        text: "Restoring Work Mode..."
+                        text: "正在恢复工作模式..."
                         color: "#66ffffff"
                         font.pixelSize: 14
                         anchors.centerIn: parent

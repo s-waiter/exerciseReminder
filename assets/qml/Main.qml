@@ -203,14 +203,14 @@ Window {
                         Text { 
                             // 安全访问属性，如果未定义(旧C++)则显示默认值
                             property var val: timerEngine.workDurationMinutes
-                            text: (val !== undefined ? val : 45) + " MIN"
+                            text: (val !== undefined ? val : 45) + " 分钟"
                             color: "white"
                             font.bold: true
                             font.pixelSize: 14
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                         Text { 
-                            text: "INTERVAL"
+                            text: "间隔时长"
                             color: "#8899A6"
                             font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter
