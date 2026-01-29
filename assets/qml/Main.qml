@@ -15,10 +15,10 @@ Window {
     id: mainWindow
     
     // 动态调整窗口大小：
-    // isPinned (迷你模式): 180x180
-    // Normal (正常模式): 280x420
-    width: isPinned ? 180 : 280
-    height: isPinned ? 180 : 420
+    // isPinned (迷你模式): 120x120
+    // Normal (正常模式): 280x420 (恢复到用户觉得舒适的尺寸)
+    width: isPinned ? 120 : 280
+    height: isPinned ? 120 : 420
     visible: true
     title: "久坐提醒助手"
     color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
@@ -68,17 +68,20 @@ Window {
         // 为了让视觉中心（倒计时圆环）看起来还在原来的位置，我们需要反向移动窗口坐标。
         // 
         // 计算依据：
-        // 1. 水平方向：Normal宽280(中心140) -> Mini宽180(中心90)。差值 50。
-        //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 50。
-        // 2. 垂直方向：Normal TopMargin 60 -> Mini TopMargin 15。差值 45。
-        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 45。
+        // 1. 水平方向：Normal宽280(中心140) -> Mini宽120(中心60)。差值 80。
+        //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 80。
+        // 2. 垂直方向：Normal TopMargin 60 -> Mini TopMargin 10。
+        //    Normal CircleCenterY = 60 + 150/2 = 135
+        //    Mini CircleCenterY = 10 + 100/2 = 60
+        //    差值 135 - 60 = 75。
+        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 75。
         
         if (isPinned) {
-            mainWindow.x += 50
-            mainWindow.y += 45
+            mainWindow.x += 80
+            mainWindow.y += 75
         } else {
-            mainWindow.x -= 50
-            mainWindow.y -= 45
+            mainWindow.x -= 80
+            mainWindow.y -= 75
         }
     }
     
@@ -150,13 +153,17 @@ Window {
             Rectangle {
                 id: glowRect
                 // 迷你模式下居中，正常模式下保持在左上角
-                width: 220
-                height: 220
-                radius: 110
+                width: isPinned ? 160 : 220
+                height: isPinned ? 160 : 220
+                radius: width / 2
                 color: mainWindow.themeColor
                 opacity: 0.05
                 x: isPinned ? (parent.width - width) / 2 : -40
                 y: isPinned ? (parent.height - height) / 2 : -40
+                
+                // 尺寸平滑过渡
+                Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+                Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
                 
                 // 位置平滑过渡
                 Behavior on x { NumberAnimation { duration: 200 } }
@@ -175,7 +182,7 @@ Window {
             Item {
             id: titleBar
             width: parent.width
-            height: isPinned ? 30 : 40
+            height: isPinned ? 20 : 40
             anchors.top: parent.top
             z: 10 
             
@@ -228,17 +235,20 @@ Window {
         // 1. 环形进度条 + 时间显示 (独立于 Column，固定位置)
         Item {
             id: circleItem
-            width: 150
-            height: 150
+            // 动态调整尺寸：Normal 150 -> Mini 100
+            width: isPinned ? 100 : 150
+            height: isPinned ? 100 : 150
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            // Normal模式下下移 60px 以避开标题栏，Mini模式下仅保留 15px 边距居中
+            // Normal模式下下移 60px 以避开标题栏，Mini模式下仅保留 10px 边距居中
             // 配合 onIsPinnedChanged 中的窗口坐标补偿，实现视觉位置静止
-            anchors.topMargin: isPinned ? 15 : 60
+            anchors.topMargin: isPinned ? 10 : 60
             
-            // 关键：Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
+            // 关键：尺寸和 Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
             // 这样 WindowY(t) + TopMargin(t) = Constant，从而消除视觉抖动
-            Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+            Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+            Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+            Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
             
             // 外圈轨道
             Rectangle {
@@ -280,7 +290,7 @@ Window {
                     ctx.beginPath();
                     // arc 参数: x, y, radius, startAngle, endAngle, antiClockwise
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
-                    ctx.lineWidth = 6;
+                    ctx.lineWidth = isPinned ? 5 : 6;
                     ctx.lineCap = "round"; // 圆头线帽
                     
                     // 创建线性渐变色画笔
@@ -312,19 +322,23 @@ Window {
                     // 补零格式化: 9:5 -> 09:05
                     text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
                     color: "#ffffff"
-                    font.pixelSize: 34
+                    font.pixelSize: isPinned ? 24 : 34 // 动态字体大小
                     font.family: "Segoe UI Light" // 细体字更有科技感
                     font.weight: Font.Light
                     anchors.horizontalCenter: parent.horizontalCenter
+                    
+                    Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
                 }
                 
                 Text {
                     text: timerEngine.statusText
                     color: mainWindow.themeColor
-                    font.pixelSize: 12
+                    font.pixelSize: isPinned ? 10 : 12 // 动态字体大小
                     font.bold: true
                     anchors.horizontalCenter: parent.horizontalCenter
                     opacity: 0.8
+                    
+                    Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
                 }
 
                 // 预计结束时间 (ETA)
@@ -332,13 +346,9 @@ Window {
                     text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
                     color: "#8899A6" // 弱化显示
                     font.pixelSize: 12
-                    // 使用 opacity 控制显示，避免 visible 导致的布局抖动
-                    opacity: timerEngine.statusText === "工作中" ? 0.6 : 0.0
-                    visible: true 
+                    // 在迷你模式下隐藏，避免遮挡和拥挤，保持界面清爽
+                    visible: !isPinned && timerEngine.statusText === "工作中"
                     anchors.horizontalCenter: parent.horizontalCenter
-                    
-                    // 平滑过渡
-                    Behavior on opacity { NumberAnimation { duration: 200 } }
                 }
             }
 
@@ -446,18 +456,18 @@ Window {
         // 仅在 Normal 模式下显示
         Row {
             id: statusRow
-            spacing: 15
+            spacing: 10
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: circleItem.bottom
-            anchors.topMargin: 20
+            anchors.topMargin: 15
             visible: !mainWindow.isPinned
             height: visible ? implicitHeight : 0 // 确保隐藏时不占位
                 
                 // 间隔设置卡片
                 Rectangle {
                     id: intervalCard
-                    width: 80
-                    height: 50
+                    width: 60
+                    height: 40
                     color: "#1Affffff"
                     radius: 10
                     border.color: intervalMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
@@ -492,7 +502,7 @@ Window {
                             text: (val !== undefined ? val : 45) + " min"
                             color: "white"
                             font.bold: true
-                            font.pixelSize: 14
+                            font.pixelSize: 12
                             font.family: "Segoe UI"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
@@ -500,7 +510,7 @@ Window {
                         Text { 
                             text: "间隔时长"
                             color: "#8899A6"
-                            font.pixelSize: 10
+                            font.pixelSize: 8
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                     }
@@ -509,8 +519,8 @@ Window {
                 // 开机自启卡片 (极简 Switch 风格)
                 Rectangle {
                     id: autoStartCard
-                    width: 100
-                    height: 60
+                    width: 60
+                    height: 40
                     color: "#1Affffff"
                     radius: 10
                     border.color: autoStartMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
@@ -692,6 +702,7 @@ Window {
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 14
                     }
                     width: 100
                     height: 40
