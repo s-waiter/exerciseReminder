@@ -47,46 +47,64 @@ Window {
     }
 
     // 主背景容器
-    Rectangle {
-        id: bgRect
+    Item {
+        id: bgContainer
         anchors.fill: parent
-        radius: isPinned ? width / 2 : 20
-        clip: true
         
-        // 高科技感渐变背景
-        gradient: Gradient {
-            GradientStop {
-                position: 0.0
-                color: "#141E30"
-            } // 深蓝黑
-            GradientStop {
-                position: 1.0
-                color: "#243B55"
-            } // 深灰蓝
-        }
-
-        // 装饰性光晕
-        Rectangle {
-            id: glowRect
-            width: 300
-            height: 300
-            radius: 150
-            color: mainWindow.themeColor
-            opacity: 0.05
-            x: -50
-            y: -50
-            
-            // 呼吸动画
-            SequentialAnimation on opacity {
-                running: timerEngine.statusText === "工作中"
-                loops: Animation.Infinite
-                NumberAnimation { from: 0.05; to: 0.15; duration: 2000; easing.type: Easing.InOutQuad }
-                NumberAnimation { from: 0.15; to: 0.05; duration: 2000; easing.type: Easing.InOutQuad }
+        // 使用 OpacityMask 实现完美的圆角裁剪
+        layer.enabled: true
+        layer.effect: OpacityMask {
+            maskSource: Rectangle {
+                width: bgContainer.width
+                height: bgContainer.height
+                radius: isPinned ? width / 2 : 20
+                visible: false
             }
         }
-        
-        // 顶部标题栏区域
-        Item {
+
+        Rectangle {
+            id: bgRect
+            anchors.fill: parent
+            // radius: isPinned ? width / 2 : 20 // 移除 radius 和 clip，由 OpacityMask 接管
+            // clip: true
+            
+            // 高科技感渐变背景
+            gradient: Gradient {
+                GradientStop {
+                    position: 0.0
+                    color: "#141E30"
+                } // 深蓝黑
+                GradientStop {
+                    position: 1.0
+                    color: "#243B55"
+                } // 深灰蓝
+            }
+
+            // 装饰性光晕
+            Rectangle {
+                id: glowRect
+                // 迷你模式下居中，正常模式下保持在左上角
+                width: 300
+                height: 300
+                radius: 150
+                color: mainWindow.themeColor
+                opacity: 0.05
+                x: isPinned ? (parent.width - width) / 2 : -50
+                y: isPinned ? (parent.height - height) / 2 : -50
+                Behavior on x { NumberAnimation { duration: 200 } }
+                Behavior on y { NumberAnimation { duration: 200 } }
+                
+                // 呼吸动画
+                SequentialAnimation on opacity {
+                    running: timerEngine.statusText === "工作中"
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.05; to: 0.15; duration: 2000; easing.type: Easing.InOutQuad }
+                    NumberAnimation { from: 0.15; to: 0.05; duration: 2000; easing.type: Easing.InOutQuad }
+                }
+            }
+            
+            // 顶部标题栏区域
+            Item {
             id: titleBar
             width: parent.width
             height: isPinned ? 40 : 50
@@ -130,27 +148,6 @@ Window {
                         verticalAlignment: Text.AlignVCenter
                     }
                     onClicked: mainWindow.isPinned = !mainWindow.isPinned
-                    
-                    ToolTip {
-                        id: pinToolTip
-                        visible: pinBtn.hovered
-                        delay: 500
-                        text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
-                        
-                        contentItem: Text {
-                            text: pinToolTip.text
-                            font: pinToolTip.font
-                            color: "#ffffff"
-                        }
-                        
-                        background: Rectangle {
-                            color: "#141E30"
-                            border.color: mainWindow.themeColor
-                            border.width: 1
-                            radius: 5
-                            opacity: 0.9
-                        }
-                    }
                 }
 
                 // 关闭/隐藏按钮
@@ -278,30 +275,38 @@ Window {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true // 开启悬停以显示详细 ETA
-                    onClicked: timerEngine.togglePause()
                     
-                    ToolTip {
-                        id: centerToolTip
-                        visible: centerMouseArea.containsMouse
-                        delay: 500
-                        
-                        text: {
-                             if (timerEngine.statusText === "已暂停") return "点击继续"
-                             return "点击暂停\n预计 " + timerEngine.estimatedFinishTime + " 结束"
+                    // 支持拖拽窗口
+                    property point clickPos
+                    property bool isDrag: false
+                    
+                    onPressed: {
+                        clickPos = Qt.point(mouseX, mouseY)
+                        isDrag = false
+                        // lastPos 用于计算位移增量
+                        lastPos = Qt.point(mouseX, mouseY)
+                    }
+                    
+                    property point lastPos
+                    onPositionChanged: {
+                        if(pressed) {
+                            var dx = mouseX - lastPos.x
+                            var dy = mouseY - lastPos.y
+                            
+                            // 判断是否发生拖拽（设定 3 像素阈值）
+                            if (!isDrag && (Math.abs(mouseX - clickPos.x) > 3 || Math.abs(mouseY - clickPos.y) > 3)) {
+                                isDrag = true
+                            }
+                            
+                            mainWindow.x += dx
+                            mainWindow.y += dy
                         }
-                        
-                        contentItem: Text {
-                            text: centerToolTip.text
-                            font: centerToolTip.font
-                            color: "#ffffff"
-                        }
-                        
-                        background: Rectangle {
-                            color: "#141E30"
-                            border.color: mainWindow.themeColor
-                            border.width: 1
-                            radius: 5
-                            opacity: 0.9
+                    }
+                    
+                    onClicked: {
+                        // 只有在非拖拽情况下才触发暂停
+                        if (!isDrag) {
+                            timerEngine.togglePause()
                         }
                     }
                 }
@@ -584,6 +589,7 @@ Window {
                 }
             }
         }
+    }
     }
 
     // 主题控制器
