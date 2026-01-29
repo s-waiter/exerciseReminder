@@ -13,6 +13,8 @@ class TimerEngine : public QObject
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
     // 暴露给QML的属性：工作间隔（分钟）
     Q_PROPERTY(int workDurationMinutes READ workDurationMinutes WRITE setWorkDurationMinutes NOTIFY workDurationMinutesChanged)
+    // 暴露给QML的属性：预计完成时间 (HH:mm)
+    Q_PROPERTY(QString estimatedFinishTime READ estimatedFinishTime NOTIFY timeUpdated)
 
 public:
     explicit TimerEngine(QObject *parent = nullptr);
@@ -20,6 +22,7 @@ public:
     int remainingSeconds() const;
     QString statusText() const;
     int workDurationMinutes() const;
+    QString estimatedFinishTime() const;
 
 public slots:
     // 设置工作间隔（分钟）
@@ -30,6 +33,8 @@ public slots:
     void snooze();
     // 暂停/停止计时
     void stop();
+    // 切换暂停/继续状态
+    Q_INVOKABLE void togglePause();
 
 signals:
     // 时间更新信号（每秒触发）

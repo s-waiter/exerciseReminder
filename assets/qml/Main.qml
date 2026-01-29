@@ -15,6 +15,15 @@ Window {
     // 窗口标志：去除默认标题栏，自定义边框
     property bool isPinned: false
     flags: Qt.FramelessWindowHint | Qt.Window
+
+    // 动态主题色逻辑
+    property color themeColor: {
+        switch(timerEngine.statusText) {
+            case "已暂停": return "#ffbf00" // 琥珀金
+            case "请休息": return "#00ff88" // 春日绿
+            default: return "#00d2ff"       // 科技蓝
+        }
+    }
     
     onIsPinnedChanged: {
         windowUtils.setTopMost(mainWindow, isPinned)
@@ -58,13 +67,22 @@ Window {
 
         // 装饰性光晕
         Rectangle {
+            id: glowRect
             width: 300
             height: 300
             radius: 150
-            color: "#00d2ff"
+            color: mainWindow.themeColor
             opacity: 0.05
             x: -50
             y: -50
+            
+            // 呼吸动画
+            SequentialAnimation on opacity {
+                running: timerEngine.statusText === "工作中"
+                loops: Animation.Infinite
+                NumberAnimation { from: 0.05; to: 0.15; duration: 2000; easing.type: Easing.InOutQuad }
+                NumberAnimation { from: 0.15; to: 0.05; duration: 2000; easing.type: Easing.InOutQuad }
+            }
         }
         
         // 顶部标题栏区域
@@ -99,21 +117,40 @@ Window {
                 
                 // 置顶按钮
                 Button {
+                    id: pinBtn
                     width: 30
                     height: 30
+                    hoverEnabled: true
                     background: Rectangle { color: "transparent" }
                     contentItem: Text {
                         text: "📌"
-                        color: mainWindow.isPinned ? "#00d2ff" : "#8899A6"
+                        color: mainWindow.isPinned ? mainWindow.themeColor : "#8899A6"
                         font.pixelSize: 16
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
                     onClicked: mainWindow.isPinned = !mainWindow.isPinned
                     
-                    // 提示工具 (ToolTip)
-                    ToolTip.visible: hovered
-                    ToolTip.text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
+                    ToolTip {
+                        id: pinToolTip
+                        visible: pinBtn.hovered
+                        delay: 500
+                        text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
+                        
+                        contentItem: Text {
+                            text: pinToolTip.text
+                            font: pinToolTip.font
+                            color: "#ffffff"
+                        }
+                        
+                        background: Rectangle {
+                            color: "#141E30"
+                            border.color: mainWindow.themeColor
+                            border.width: 1
+                            radius: 5
+                            opacity: 0.9
+                        }
+                    }
                 }
 
                 // 关闭/隐藏按钮
@@ -163,7 +200,9 @@ Window {
                     
                     // 绑定属性以便重绘
                     property double progress: timerEngine.remainingSeconds / (45 * 60.0)
+                    property color drawColor: mainWindow.themeColor
                     onProgressChanged: requestPaint()
+                    onDrawColorChanged: requestPaint()
 
                     onPaint: {
                         var ctx = getContext("2d");
@@ -181,8 +220,15 @@ Window {
                         
                         // 渐变色画笔
                         var gradient = ctx.createLinearGradient(0, 0, width, height);
-                        gradient.addColorStop(0, "#00d2ff"); // 青色
-                        gradient.addColorStop(1, "#3a7bd5"); // 蓝色
+                        gradient.addColorStop(0, drawColor); // 主色
+                        gradient.addColorStop(1, "#3a7bd5"); // 蓝色 (可以保持蓝色基调，或者也跟随变化？跟随变化更好)
+                        // 让尾部稍微偏蓝一点，保持科技感
+                        if (drawColor == "#ffbf00") {
+                             gradient.addColorStop(1, "#ff9100"); // 琥珀色的渐变尾
+                        } else if (drawColor == "#00ff88") {
+                             gradient.addColorStop(1, "#00bfa5"); // 绿色的渐变尾
+                        }
+                        
                         ctx.strokeStyle = gradient;
                         
                         ctx.stroke();
@@ -208,11 +254,55 @@ Window {
                     
                     Text {
                         text: timerEngine.statusText
-                        color: "#00d2ff"
+                        color: mainWindow.themeColor
                         font.pixelSize: 14
                         font.bold: true
                         anchors.horizontalCenter: parent.horizontalCenter
                         opacity: 0.8
+                    }
+
+                    // 预计结束时间 (ETA)
+                    Text {
+                        text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
+                        color: "#8899A6" // 弱化显示
+                        font.pixelSize: 12
+                        visible: timerEngine.statusText === "工作中"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        opacity: 0.6
+                    }
+                }
+
+                // 交互层：点击暂停/继续
+                MouseArea {
+                    id: centerMouseArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true // 开启悬停以显示详细 ETA
+                    onClicked: timerEngine.togglePause()
+                    
+                    ToolTip {
+                        id: centerToolTip
+                        visible: centerMouseArea.containsMouse
+                        delay: 500
+                        
+                        text: {
+                             if (timerEngine.statusText === "已暂停") return "点击继续"
+                             return "点击暂停\n预计 " + timerEngine.estimatedFinishTime + " 结束"
+                        }
+                        
+                        contentItem: Text {
+                            text: centerToolTip.text
+                            font: centerToolTip.font
+                            color: "#ffffff"
+                        }
+                        
+                        background: Rectangle {
+                            color: "#141E30"
+                            border.color: mainWindow.themeColor
+                            border.width: 1
+                            radius: 5
+                            opacity: 0.9
+                        }
                     }
                 }
             }
@@ -226,15 +316,51 @@ Window {
                 
                 // 间隔设置卡片
                 Rectangle {
+                    id: intervalCard
                     width: 100
                     height: 60
                     color: "#1Affffff"
                     radius: 10
                     
+                    // 悬停缩放效果
+                    scale: intervalMouseArea.containsMouse ? 1.05 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+
                     MouseArea {
+                        id: intervalMouseArea
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
                         onClicked: settingsPopup.open()
+                        onWheel: {
+                            // 滚轮快速调节
+                            var delta = wheel.angleDelta.y > 0 ? 1 : -1
+                            var newVal = timerEngine.workDurationMinutes + delta
+                            if (newVal >= 1 && newVal <= 120) {
+                                timerEngine.workDurationMinutes = newVal
+                            }
+                        }
+                        
+                        ToolTip {
+                            id: intervalToolTip
+                            visible: intervalMouseArea.containsMouse
+                            delay: 500
+                            text: "滚轮可快速调节时长\n点击打开详细设置"
+                            
+                            contentItem: Text {
+                                text: intervalToolTip.text
+                                font: intervalToolTip.font
+                                color: "#ffffff"
+                            }
+                            
+                            background: Rectangle {
+                                color: "#141E30"
+                                border.color: mainWindow.themeColor
+                                border.width: 1
+                                radius: 5
+                                opacity: 0.9
+                            }
+                        }
                     }
                     
                     Column {

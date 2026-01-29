@@ -24,6 +24,11 @@ int TimerEngine::workDurationMinutes() const {
     return m_workDuration / 60;
 }
 
+QString TimerEngine::estimatedFinishTime() const {
+    if (m_status == "已暂停") return "--:--";
+    return QDateTime::currentDateTime().addSecs(m_remainingSecs).toString("HH:mm");
+}
+
 void TimerEngine::setWorkDurationMinutes(int minutes) {
     if (minutes < 1) minutes = 1; // 至少1分钟
     int newDuration = minutes * 60;
@@ -76,6 +81,22 @@ void TimerEngine::stop() {
     m_timer->stop();
     m_status = "已暂停";
     emit statusChanged();
+}
+
+void TimerEngine::togglePause() {
+    if (m_timer->isActive()) {
+        stop();
+    } else {
+        // 如果是暂停状态，则恢复
+        if (m_status == "已暂停") {
+            m_status = "工作中";
+            emit statusChanged();
+            m_timer->start();
+        } else {
+            // 其他状态（如休息中、准备就绪），默认开始新工作
+            startWork();
+        }
+    }
 }
 
 void TimerEngine::onTick() {
