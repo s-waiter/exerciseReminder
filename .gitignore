@@ -4,6 +4,10 @@
 *.qmake.stash
 Makefile*
 object_script.*
+.qmake.cache
+
+# Qt Creator settings
+.qtcreator/
 
 # Compiled Object files
 *.slo
@@ -30,23 +34,38 @@ object_script.*
 *.a
 *.lib
 
-# Executables
+# Executables and Binaries
 *.exe
 *.out
 *.app
+*.zip
+*.7z
+*.rar
+
+# Debugging and Intermediate Files (MSVC)
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.aps
+*.opt
+*.ncb
+*.suo
+*.sdf
+*.opensdf
 
 # Qt generated files (moc, ui, rcc)
 moc_*.cpp
 ui_*.h
 qrc_*.cpp
-.qmake.cache
-.qmake.stash
 
-# Qt Creator build directories
+# Build directories
 build-*/
 debug/
 release/
 build/
+dist/
+dist_release/
 
 # VS Code
 .vscode/
