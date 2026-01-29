@@ -15,10 +15,10 @@ Window {
     id: mainWindow
     
     // 动态调整窗口大小：
-    // isPinned (迷你模式): 260x260
-    // Normal (正常模式): 360x520
-    width: isPinned ? 260 : 360
-    height: isPinned ? 260 : 520
+    // isPinned (迷你模式): 180x180
+    // Normal (正常模式): 280x420
+    width: isPinned ? 180 : 280
+    height: isPinned ? 180 : 420
     visible: true
     title: "久坐提醒助手"
     color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
@@ -68,17 +68,17 @@ Window {
         // 为了让视觉中心（倒计时圆环）看起来还在原来的位置，我们需要反向移动窗口坐标。
         // 
         // 计算依据：
-        // 1. 水平方向：Normal宽360(中心180) -> Mini宽260(中心130)。差值 50。
+        // 1. 水平方向：Normal宽280(中心140) -> Mini宽180(中心90)。差值 50。
         //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 50。
-        // 2. 垂直方向：Normal TopMargin 70 -> Mini TopMargin 20。差值 50。
-        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 50。
+        // 2. 垂直方向：Normal TopMargin 60 -> Mini TopMargin 15。差值 45。
+        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 45。
         
         if (isPinned) {
             mainWindow.x += 50
-            mainWindow.y += 50
+            mainWindow.y += 45
         } else {
             mainWindow.x -= 50
-            mainWindow.y -= 50
+            mainWindow.y -= 45
         }
     }
     
@@ -150,13 +150,13 @@ Window {
             Rectangle {
                 id: glowRect
                 // 迷你模式下居中，正常模式下保持在左上角
-                width: 300
-                height: 300
-                radius: 150
+                width: 220
+                height: 220
+                radius: 110
                 color: mainWindow.themeColor
                 opacity: 0.05
-                x: isPinned ? (parent.width - width) / 2 : -50
-                y: isPinned ? (parent.height - height) / 2 : -50
+                x: isPinned ? (parent.width - width) / 2 : -40
+                y: isPinned ? (parent.height - height) / 2 : -40
                 
                 // 位置平滑过渡
                 Behavior on x { NumberAnimation { duration: 200 } }
@@ -175,7 +175,7 @@ Window {
             Item {
             id: titleBar
             width: parent.width
-            height: isPinned ? 40 : 50
+            height: isPinned ? 30 : 40
             anchors.top: parent.top
             z: 10 
             
@@ -228,13 +228,13 @@ Window {
         // 1. 环形进度条 + 时间显示 (独立于 Column，固定位置)
         Item {
             id: circleItem
-            width: 220
-            height: 220
+            width: 150
+            height: 150
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            // Normal模式下下移 70px 以避开标题栏，Mini模式下仅保留 20px 边距居中
+            // Normal模式下下移 60px 以避开标题栏，Mini模式下仅保留 15px 边距居中
             // 配合 onIsPinnedChanged 中的窗口坐标补偿，实现视觉位置静止
-            anchors.topMargin: isPinned ? 20 : 70
+            anchors.topMargin: isPinned ? 15 : 60
             
             // 关键：Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
             // 这样 WindowY(t) + TopMargin(t) = Constant，从而消除视觉抖动
@@ -280,7 +280,7 @@ Window {
                     ctx.beginPath();
                     // arc 参数: x, y, radius, startAngle, endAngle, antiClockwise
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
-                    ctx.lineWidth = 8;
+                    ctx.lineWidth = 6;
                     ctx.lineCap = "round"; // 圆头线帽
                     
                     // 创建线性渐变色画笔
@@ -312,7 +312,7 @@ Window {
                     // 补零格式化: 9:5 -> 09:05
                     text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
                     color: "#ffffff"
-                    font.pixelSize: 48
+                    font.pixelSize: 34
                     font.family: "Segoe UI Light" // 细体字更有科技感
                     font.weight: Font.Light
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -321,7 +321,7 @@ Window {
                 Text {
                     text: timerEngine.statusText
                     color: mainWindow.themeColor
-                    font.pixelSize: 14
+                    font.pixelSize: 12
                     font.bold: true
                     anchors.horizontalCenter: parent.horizontalCenter
                     opacity: 0.8
@@ -408,18 +408,18 @@ Window {
         // 仅在 Normal 模式下显示
         Row {
             id: statusRow
-            spacing: 20
+            spacing: 15
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: circleItem.bottom
-            anchors.topMargin: 30
+            anchors.topMargin: 20
             visible: !mainWindow.isPinned
             height: visible ? implicitHeight : 0 // 确保隐藏时不占位
                 
                 // 间隔设置卡片
                 Rectangle {
                     id: intervalCard
-                    width: 100
-                    height: 60
+                    width: 80
+                    height: 50
                     color: "#1Affffff"
                     radius: 10
                     border.color: intervalMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
@@ -454,7 +454,7 @@ Window {
                             text: (val !== undefined ? val : 45) + " min"
                             color: "white"
                             font.bold: true
-                            font.pixelSize: 16
+                            font.pixelSize: 14
                             font.family: "Segoe UI"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
@@ -655,8 +655,8 @@ Window {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
-                    width: 120
-                    height: 45
+                    width: 100
+                    height: 40
                 }
 
                 CyberButton {
