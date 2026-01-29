@@ -71,7 +71,7 @@ Window {
             anchors.top: parent.top
             
             Text {
-                text: "EXERCISE REMINDER"
+                text: "久坐提醒助手"
                 color: "#8899A6"
                 font.pixelSize: 12
                 font.letterSpacing: 2
@@ -265,7 +265,7 @@ Window {
                         }
 
                         Text { 
-                            text: "AUTO START"
+                            text: "开机自启"
                             color: "#8899A6"
                             font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter

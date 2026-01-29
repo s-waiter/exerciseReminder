@@ -235,7 +235,7 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     
                     Text {
-                        text: "SESSION COMPLETE"
+                        text: "本次运动完成"
                         color: "#88ffffff"
                         font.pixelSize: 12
                         font.letterSpacing: 3
@@ -679,12 +679,12 @@ Window {
             spacing: 15
             
             Text {
-                text: "TIME TO MOVE!"
+                text: "该起来活动了!"
                 color: "white"
                 font.pixelSize: 48
                 font.bold: true
                 font.letterSpacing: 4
-                font.family: "Segoe UI Black"
+                font.family: "Microsoft YaHei UI" // 中文友好字体
                 anchors.horizontalCenter: parent.horizontalCenter
                 style: Text.Outline
                 styleColor: currentTheme.textColor
