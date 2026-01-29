@@ -16,7 +16,13 @@ Window {
     color: "transparent" // 透明背景，为了自定义圆角或异形窗口（如果 flag 允许）
     
     // 窗口标志：去除默认标题栏，自定义边框
+    property bool isPinned: false
+    // 移除 Qt.WindowStaysOnTopHint 的绑定，改用 C++ 手动控制
     flags: Qt.FramelessWindowHint | Qt.Window
+    
+    onIsPinnedChanged: {
+        windowUtils.setTopMost(mainWindow, isPinned)
+    }
     
     // 拖拽窗口逻辑
     MouseArea {
@@ -79,8 +85,31 @@ Window {
                 anchors.centerIn: parent
             }
 
+            // 置顶按钮
+            Button {
+                width: 30
+                height: 30
+                anchors.right: closeBtn.left
+                anchors.rightMargin: 5
+                anchors.verticalCenter: parent.verticalCenter
+                background: Rectangle { color: "transparent" }
+                contentItem: Text {
+                    text: "📌"
+                    color: mainWindow.isPinned ? "#00d2ff" : "#8899A6"
+                    font.pixelSize: 16
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: mainWindow.isPinned = !mainWindow.isPinned
+                
+                // 提示工具 (ToolTip)
+                ToolTip.visible: hovered
+                ToolTip.text: mainWindow.isPinned ? "取消置顶" : "置顶窗口"
+            }
+
             // 关闭/隐藏按钮
             Button {
+                id: closeBtn
                 width: 30
                 height: 30
                 anchors.right: parent.right

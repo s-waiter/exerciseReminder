@@ -6,6 +6,7 @@
 #include "core/AppConfig.h"
 #include "core/TimerEngine.h"
 #include "gui/TrayIcon.h"
+#include "utils/WindowUtils.h"
 
 int main(int argc, char *argv[])
 {
@@ -22,6 +23,7 @@ int main(int argc, char *argv[])
     TimerEngine timerEngine;
     TrayIcon trayIcon;
     AppConfig appConfig;
+    WindowUtils windowUtils;
 
     // 4. 连接 C++ 内部信号
     // 当计时器更新时，更新托盘提示信息
@@ -42,6 +44,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("timerEngine", &timerEngine);
     engine.rootContext()->setContextProperty("trayIcon", &trayIcon);
     engine.rootContext()->setContextProperty("appConfig", &appConfig);
+    engine.rootContext()->setContextProperty("windowUtils", &windowUtils);
 
     // 加载主 QML 文件
     const QUrl url(QStringLiteral("qrc:/assets/qml/Main.qml"));
