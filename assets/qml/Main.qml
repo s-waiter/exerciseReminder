@@ -246,14 +246,14 @@ Window {
                             indicator: Rectangle {
                                 implicitWidth: 48
                                 implicitHeight: 26
-                                x: parent.leftPadding
+                                x: autoStartSwitch.leftPadding
                                 y: parent.height / 2 - height / 2
                                 radius: 13
-                                color: parent.checked ? "#00d2ff" : "#2C3E50"
-                                border.color: parent.checked ? "#00d2ff" : "#cccccc"
+                                color: autoStartSwitch.checked ? "#00d2ff" : "#2C3E50"
+                                border.color: autoStartSwitch.checked ? "#00d2ff" : "#cccccc"
                                 
                                 Rectangle {
-                                    x: parent.checked ? parent.width - width - 2 : 2
+                                    x: autoStartSwitch.checked ? parent.width - width - 2 : 2
                                     y: 2
                                     width: 22
                                     height: 22
