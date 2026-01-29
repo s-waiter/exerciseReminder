@@ -269,7 +269,7 @@ Window {
                             color: "white"
                             font.pixelSize: 24
                             font.bold: true
-                            horizontalAlignment: Text.AlignHCenter
+                            anchors.horizontalCenter: parent.horizontalCenter // 确保居中对齐
                             
                             // 简单的出现动画
                             opacity: 0
@@ -283,7 +283,7 @@ Window {
                             text: "时间段: " + overlayWin.sessionTimeRange
                             color: "#aaffffff"
                             font.pixelSize: 14
-                            horizontalAlignment: Text.AlignHCenter
+                            anchors.horizontalCenter: parent.horizontalCenter // 确保居中对齐
                             visible: overlayWin.sessionTimeRange !== ""
                         }
                     }
@@ -302,7 +302,18 @@ Window {
                             var total = overlayWin.todayTotalSeconds
                             var h = Math.floor(total / 3600)
                             var m = Math.floor((total % 3600) / 60)
-                            return "今日累计运动: " + (h > 0 ? h + "小时 " : "") + m + "分钟"
+                            var s = total % 60
+                            
+                            var timeStr = ""
+                            if (h > 0) {
+                                timeStr = h + "小时" + m + "分钟"
+                            } else if (m > 0) {
+                                timeStr = m + "分钟" + s + "秒"
+                            } else {
+                                timeStr = s + "秒"
+                            }
+                            
+                            return "今日累计运动: " + timeStr
                         }
                         color: currentTheme.gradientEnd // 使用主题色高亮
                         font.pixelSize: 16
@@ -412,7 +423,7 @@ Window {
                             
                             // 标题
                             Text {
-                                text: "今日运动记录"
+                                text: "今日运动记录 (" + overlayWin.todaySessions.length + ")"
                                 color: "#66ffffff"
                                 font.pixelSize: 10
                                 anchors.left: parent.left
@@ -430,8 +441,21 @@ Window {
                                 model: overlayWin.todaySessions
                                 spacing: 8
                                 
+                                // 添加滚动条
+                                ScrollBar.vertical: ScrollBar {
+                                    active: true
+                                    width: 4
+                                    background: Rectangle { color: "transparent" }
+                                    contentItem: Rectangle {
+                                        implicitWidth: 4
+                                        implicitHeight: 100
+                                        radius: 2
+                                        color: "#33ffffff"
+                                    }
+                                }
+                                
                                 delegate: Item {
-                                    width: parent.width
+                                    width: sessionList.width
                                     height: 24
                                     
                                     // 时间轴连线 (装饰)
