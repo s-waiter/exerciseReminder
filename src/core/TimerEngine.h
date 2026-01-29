@@ -89,6 +89,9 @@ public slots:
     // 获取今日累计运动时长 (秒)
     Q_INVOKABLE int getTodayExerciseSeconds();
     
+    // 获取今日所有运动时段详情 (返回 [{start: "13:50", end: "13:51", duration: 60}, ...])
+    Q_INVOKABLE QVariantList getTodaySessions();
+
     // 获取过去7天的运动统计数据 (返回 [{date: "MM-dd", day: "Mon", seconds: 120}, ...])
     Q_INVOKABLE QVariantList getWeeklyExerciseStats();
 

@@ -155,13 +155,26 @@ void TimerEngine::recordExercise(int durationSeconds) {
     if (durationSeconds <= 0) return;
 
     QSettings settings("ExerciseReminder", "Stats");
-    QString today = QDate::currentDate().toString("yyyy-MM-dd");
+    QDateTime now = QDateTime::currentDateTime();
+    QString today = now.toString("yyyy-MM-dd");
     
-    // 读取今日已有的时长
+    // 1. 更新每日总时长
     int current = settings.value(today, 0).toInt();
-    
-    // 累加并保存
     settings.setValue(today, current + durationSeconds);
+    
+    // 2. 记录本次会话详情
+    QString sessionKey = "Sessions/" + today;
+    QVariantList sessions = settings.value(sessionKey).toList();
+    
+    QVariantMap session;
+    // 计算开始时间
+    QDateTime start = now.addSecs(-durationSeconds);
+    session["start"] = start.toString("HH:mm");
+    session["end"] = now.toString("HH:mm");
+    session["duration"] = durationSeconds;
+    
+    sessions.append(session);
+    settings.setValue(sessionKey, sessions);
     
     // 强制同步以确保写入磁盘
     settings.sync();
@@ -173,6 +186,12 @@ int TimerEngine::getTodayExerciseSeconds() {
     QSettings settings("ExerciseReminder", "Stats");
     QString today = QDate::currentDate().toString("yyyy-MM-dd");
     return settings.value(today, 0).toInt();
+}
+
+QVariantList TimerEngine::getTodaySessions() {
+    QSettings settings("ExerciseReminder", "Stats");
+    QString todayKey = "Sessions/" + QDate::currentDate().toString("yyyy-MM-dd");
+    return settings.value(todayKey).toList();
 }
 
 QVariantList TimerEngine::getWeeklyExerciseStats() {

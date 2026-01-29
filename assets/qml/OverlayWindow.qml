@@ -61,6 +61,7 @@ Window {
     // 新增统计数据属性
     property int todayTotalSeconds: 0
     property var weeklyStats: []
+    property var todaySessions: [] // 今日所有会话详情
     property string sessionTimeRange: ""
 
     // 自动关闭计时器
@@ -127,8 +128,8 @@ Window {
         // 3. 核心卡片容器 (结算信息)
         Item {
             id: resultCard
-            width: 420
-            height: 520
+            width: 600
+            height: 580
             anchors.centerIn: parent
             
             // 进场动画：从下往上浮现 + 缩放
@@ -309,85 +310,174 @@ Window {
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
                     
-                    // 4. 近7天趋势图表
-                    Item {
-                        width: 320
-                        height: 120
+                    // 4. 数据展示区域 (水平布局：左侧周趋势，右侧今日时间轴)
+                    Row {
+                        spacing: 20
                         anchors.horizontalCenter: parent.horizontalCenter
                         
-                        // 图表背景
-                        Rectangle {
-                            anchors.fill: parent
-                            color: "#11ffffff"
-                            radius: 10
-                        }
-                        
-                        // 标题
-                        Text {
-                            text: "近7天运动趋势"
-                            color: "#66ffffff"
-                            font.pixelSize: 10
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.margins: 8
-                        }
-                        
-                        Row {
-                            anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 5
-                            spacing: 15
+                        // 4.1 近7天趋势图表
+                        Item {
+                            width: 320
+                            height: 160
                             
-                            Repeater {
-                                model: overlayWin.weeklyStats
-                                delegate: Column {
-                                    spacing: 5
-                                    property real maxVal: {
-                                        var m = 60 // 默认最小基准
-                                        for(var i=0; i<overlayWin.weeklyStats.length; i++) {
-                                            if(overlayWin.weeklyStats[i].seconds > m) m = overlayWin.weeklyStats[i].seconds
+                            // 图表背景
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "#11ffffff"
+                                radius: 10
+                            }
+                            
+                            // 标题
+                            Text {
+                                text: "近7天运动趋势"
+                                color: "#66ffffff"
+                                font.pixelSize: 10
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                            }
+                            
+                            Row {
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset: 5
+                                spacing: 15
+                                
+                                Repeater {
+                                    model: overlayWin.weeklyStats
+                                    delegate: Column {
+                                        spacing: 5
+                                        property real maxVal: {
+                                            var m = 60 // 默认最小基准
+                                            for(var i=0; i<overlayWin.weeklyStats.length; i++) {
+                                                if(overlayWin.weeklyStats[i].seconds > m) m = overlayWin.weeklyStats[i].seconds
+                                            }
+                                            return m
                                         }
-                                        return m
-                                    }
-                                    
-                                    property real barH: (modelData.seconds / maxVal) * 60
-                                    
-                                    // 柱状条容器
-                                    Rectangle {
-                                        width: 20
-                                        height: 60 
-                                        color: "transparent"
                                         
-                                        // 实际的柱子 (底部对齐)
+                                        property real barH: (modelData.seconds / maxVal) * 80 // 增加一点高度 (60->80)
+                                        
+                                        // 柱状条容器
                                         Rectangle {
-                                            width: parent.width
-                                            height: Math.max(2, barH) // 至少2px高度
-                                            color: modelData.isToday ? currentTheme.gradientEnd : "#44ffffff"
-                                            radius: 2
-                                            anchors.bottom: parent.bottom
+                                            width: 20
+                                            height: 80 
+                                            color: "transparent"
                                             
-                                            // 动画: 每次显示时重启动画
-                                            property bool isVisible: feedbackLayer.visible
-                                            onIsVisibleChanged: {
-                                                if(isVisible) {
-                                                    heightAnimation.restart()
+                                            // 实际的柱子 (底部对齐)
+                                            Rectangle {
+                                                width: parent.width
+                                                height: Math.max(2, barH) // 至少2px高度
+                                                color: modelData.isToday ? currentTheme.gradientEnd : "#44ffffff"
+                                                radius: 2
+                                                anchors.bottom: parent.bottom
+                                                
+                                                // 动画: 每次显示时重启动画
+                                                property bool isVisible: feedbackLayer.visible
+                                                onIsVisibleChanged: {
+                                                    if(isVisible) {
+                                                        heightAnimation.restart()
+                                                    }
+                                                }
+                                                
+                                                NumberAnimation on height {
+                                                    id: heightAnimation
+                                                    from: 0; to: Math.max(2, barH)
+                                                    duration: 800; easing.type: Easing.OutBack 
                                                 }
                                             }
-                                            
-                                            NumberAnimation on height {
-                                                id: heightAnimation
-                                                from: 0; to: Math.max(2, barH)
-                                                duration: 800; easing.type: Easing.OutBack 
-                                            }
+                                        }
+                                        
+                                        // 日期
+                                        Text {
+                                            text: modelData.date
+                                            color: modelData.isToday ? "white" : "#66ffffff"
+                                            font.pixelSize: 10
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // 4.2 今日时间轴 (Timeline)
+                        Item {
+                            width: 220
+                            height: 160
+                            
+                            // 背景
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "#11ffffff"
+                                radius: 10
+                            }
+                            
+                            // 标题
+                            Text {
+                                text: "今日运动记录"
+                                color: "#66ffffff"
+                                font.pixelSize: 10
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                            }
+
+                            // 列表视图
+                            ListView {
+                                id: sessionList
+                                anchors.fill: parent
+                                anchors.topMargin: 30
+                                anchors.bottomMargin: 10
+                                clip: true
+                                model: overlayWin.todaySessions
+                                spacing: 8
+                                
+                                delegate: Item {
+                                    width: parent.width
+                                    height: 24
                                     
-                                    // 日期
-                                    Text {
-                                        text: modelData.date
-                                        color: modelData.isToday ? "white" : "#66ffffff"
-                                        font.pixelSize: 10
-                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    // 时间轴连线 (装饰)
+                                    Rectangle {
+                                        width: 1
+                                        height: parent.height + 8
+                                        color: "#33ffffff"
+                                        x: 20
+                                        visible: index < sessionList.count - 1
+                                        anchors.top: dot.bottom
                                     }
+                                    
+                                    // 时间点圆点
+                                    Rectangle {
+                                        id: dot
+                                        width: 6; height: 6
+                                        radius: 3
+                                        color: currentTheme.gradientEnd
+                                        x: 17
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    
+                                    // 时间段文本 "13:50-13:51"
+                                    Text {
+                                        text: modelData.start + " - " + modelData.end
+                                        color: "white"
+                                        font.pixelSize: 12
+                                        anchors.left: dot.right
+                                        anchors.leftMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    
+                                    // 时长文本 "60s"
+                                    Text {
+                                        text: modelData.duration + "s"
+                                        color: "#88ffffff"
+                                        font.pixelSize: 11
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 15
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
+                                
+                                // 滚动条自动滚动到底部 (显示最新)
+                                onCountChanged: {
+                                    Qt.callLater(function() { positionViewAtEnd() })
                                 }
                             }
                         }
@@ -396,7 +486,7 @@ Window {
                 
                 // C. 底部倒计时条
                 Item {
-                    width: 300
+                    width: 500
                     height: 40
                     anchors.horizontalCenter: parent.horizontalCenter
                     
@@ -883,6 +973,7 @@ Window {
                 timerEngine.recordExercise(durationSeconds)
                 overlayWin.todayTotalSeconds = timerEngine.getTodayExerciseSeconds()
                 overlayWin.weeklyStats = timerEngine.getWeeklyExerciseStats()
+                overlayWin.todaySessions = timerEngine.getTodaySessions() // 获取最新会话列表
 
                 // 3. 格式化文本
                 var mins = Math.floor(durationSeconds / 60)
