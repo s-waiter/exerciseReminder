@@ -254,9 +254,43 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 radius: width/2
-                color: "transparent"
+                // 迷你模式下添加深色背景以增强对比度，解决文字看不清的问题
+                color: isPinned ? "#99000000" : "transparent"
                 border.color: "#33ffffff"
                 border.width: 4
+                
+                Behavior on color { ColorAnimation { duration: 300 } }
+            }
+            
+            // === 迷你模式下的呼吸光效 (背景层) ===
+            // 移出 Canvas layer，作为独立背景存在，避免覆盖进度条
+            RectangularGlow {
+                id: breathingGlow
+                anchors.fill: parent
+                glowRadius: 10
+                spread: 0.1 // 降低扩散度，避免太亮
+                // 跟随 Canvas 的动态颜色
+                color: progressCanvas.drawColor 
+                cornerRadius: width/2
+                visible: isPinned && timerEngine.statusText === "工作中"
+                opacity: 0.2 // 降低初始不透明度，防止过曝
+                
+                // 呼吸动画
+                SequentialAnimation on opacity {
+                    running: breathingGlow.visible
+                    loops: Animation.Infinite
+                    PropertyAnimation { to: 0.5; duration: 2000; easing.type: Easing.InOutSine }
+                    PropertyAnimation { to: 0.2; duration: 2000; easing.type: Easing.InOutSine }
+                }
+                
+                // 悬停时增强光效
+                states: State {
+                    when: centerMouseArea.containsMouse
+                    PropertyChanges { target: breathingGlow; spread: 0.4; opacity: 0.6 }
+                }
+                transitions: Transition {
+                    NumberAnimation { duration: 200 }
+                }
             }
 
             // 进度圆环 (Canvas 绘制)
@@ -272,7 +306,21 @@ Window {
                     // 避免除以 0
                     return total > 0 ? timerEngine.remainingSeconds / total : 0
                 }
-                property color drawColor: mainWindow.themeColor
+                
+                // 动态颜色逻辑 (仅迷你模式生效)
+                property color drawColor: {
+                    if (!isPinned) return mainWindow.themeColor
+                    
+                    // 根据剩余时间百分比改变颜色
+                    // > 80%: 科技蓝 (初始)
+                    // 50% - 80%: 清新绿 (平稳)
+                    // 20% - 50%: 警示黄 (过半)
+                    // < 20%: 紧急红 (即将结束)
+                    if (progress > 0.8) return "#00d2ff" 
+                    if (progress > 0.5) return "#00ff88"
+                    if (progress > 0.2) return "#ffbf00"
+                    return "#ff3b30"
+                }
                 
                 // 当 progress 或 drawColor 变化时，请求重新绘制
                 onProgressChanged: requestPaint()
@@ -290,18 +338,20 @@ Window {
                     ctx.beginPath();
                     // arc 参数: x, y, radius, startAngle, endAngle, antiClockwise
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
-                    ctx.lineWidth = isPinned ? 5 : 6;
+                    ctx.lineWidth = isPinned ? 6 : 6; // 迷你模式下稍微加粗一点
                     ctx.lineCap = "round"; // 圆头线帽
                     
                     // 创建线性渐变色画笔
                     var gradient = ctx.createLinearGradient(0, 0, width, height);
                     gradient.addColorStop(0, drawColor); // 主色
-                    gradient.addColorStop(1, "#3a7bd5"); // 蓝色 (可以保持蓝色基调，或者也跟随变化？跟随变化更好)
-                    // 让尾部稍微偏蓝一点，保持科技感
-                    if (drawColor == "#ffbf00") {
-                            gradient.addColorStop(1, "#ff9100"); // 琥珀色的渐变尾
-                    } else if (drawColor == "#00ff88") {
-                            gradient.addColorStop(1, "#00bfa5"); // 绿色的渐变尾
+                    
+                    // 渐变尾部颜色微调，保持色系一致但更有层次感
+                    if (isPinned) {
+                        gradient.addColorStop(1, Qt.darker(drawColor, 1.2)); 
+                    } else {
+                        gradient.addColorStop(1, "#3a7bd5");
+                        if (drawColor == "#ffbf00") gradient.addColorStop(1, "#ff9100");
+                        else if (drawColor == "#00ff88") gradient.addColorStop(1, "#00bfa5");
                     }
                     
                     ctx.strokeStyle = gradient;
@@ -322,7 +372,7 @@ Window {
                     // 补零格式化: 9:5 -> 09:05
                     text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
                     color: "#ffffff"
-                    font.pixelSize: isPinned ? 24 : 34 // 动态字体大小
+                    font.pixelSize: isPinned ? 28 : 34 // 迷你模式下字体稍微加大，因为去掉了下面的文字
                     font.family: "Segoe UI Light" // 细体字更有科技感
                     font.weight: Font.Light
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -337,6 +387,7 @@ Window {
                     font.bold: true
                     anchors.horizontalCenter: parent.horizontalCenter
                     opacity: 0.8
+                    visible: !isPinned // 迷你模式下隐藏状态文字，让界面更清爽，只留数字
                     
                     Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
                 }
@@ -742,7 +793,11 @@ Window {
             themeData: themeController.currentTheme
             visible: isReminderActive
             
-            onReminderFinished: isReminderActive = false
+            onReminderFinished: {
+                isReminderActive = false
+                // 自动开启下一轮工作倒计时
+                timerEngine.startWork()
+            }
             onSnoozeRequested: {
                 timerEngine.snooze()
                 isReminderActive = false
