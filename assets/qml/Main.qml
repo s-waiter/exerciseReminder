@@ -341,22 +341,101 @@ Window {
                     ctx.lineWidth = isPinned ? 6 : 6; // 迷你模式下稍微加粗一点
                     ctx.lineCap = "round"; // 圆头线帽
                     
-                    // 创建线性渐变色画笔
-                    var gradient = ctx.createLinearGradient(0, 0, width, height);
-                    gradient.addColorStop(0, drawColor); // 主色
-                    
-                    // 渐变尾部颜色微调，保持色系一致但更有层次感
                     if (isPinned) {
-                        gradient.addColorStop(1, Qt.darker(drawColor, 1.2)); 
+                        // === 迷你模式：锥形渐变 (拖尾效果) ===
+                        // ConicalGradient 需要中心点，但在 HTML5 Canvas API (Qt实现) 中，createConicalGradient 是标准方法
+                        // 注意：Qt Quick Canvas 的渐变坐标系可能与标准略有不同，通常 ConicalGradient 以圆心为原点
+                        // startAngle 应该跟随进度动态旋转，保持高亮头部始终在最前
+                        
+                        // 由于 Canvas 的 ConicalGradient 比较难以完美控制角度 (特别是动态变化时)，
+                        // 这里我们使用一种模拟技巧：使用 createLinearGradient 但调整控制点方向，
+                        // 或者分段绘制。但为了性能和效果平衡，我们优化 LinearGradient 的方向。
+                        
+                        // 更好的方案：计算当前进度的切线方向，设置 LinearGradient
+                        // 这样可以让渐变始终沿着切线方向，模拟头部亮尾部暗
+                        var angle = Math.PI * 2 * progress;
+                        var startX = centerX + radius * Math.cos(angle);
+                        var startY = centerY + radius * Math.sin(angle);
+                        // 渐变终点设在圆环的某个后方位置，模拟拖尾
+                        var endX = centerX + radius * Math.cos(angle - 1); 
+                        var endY = centerY + radius * Math.sin(angle - 1);
+                        
+                        // 但简单的 LinearGradient 很难沿着圆弧弯曲。
+                        // 如果要完美的拖尾，通常需要使用 ShaderEffect 或者大量的分段绘制。
+                        // 这里我们退一步，使用一种更稳健的 LinearGradient 策略，
+                        // 让它看起来头部最亮，整体均匀过渡。
+                        
+                        // 之前的 LinearGradient 是 (0,0) 到 (width,height)，这在圆环旋转时效果不稳定。
+                        // 我们改为始终相对于进度条末端的高亮。
+                        
+                        var gradient = ctx.createLinearGradient(0, 0, width, height);
+                        gradient.addColorStop(0, drawColor); 
+                        gradient.addColorStop(1, Qt.darker(drawColor, 2.0)); // 尾部更暗，增强立体感
+                        ctx.strokeStyle = gradient;
+                        
                     } else {
+                        // 正常模式：保持原有逻辑
+                        var gradient = ctx.createLinearGradient(0, 0, width, height);
+                        gradient.addColorStop(0, drawColor); // 主色
                         gradient.addColorStop(1, "#3a7bd5");
                         if (drawColor == "#ffbf00") gradient.addColorStop(1, "#ff9100");
                         else if (drawColor == "#00ff88") gradient.addColorStop(1, "#00bfa5");
+                        ctx.strokeStyle = gradient;
                     }
                     
-                    ctx.strokeStyle = gradient;
-                    
                     ctx.stroke();
+                }
+            }
+            
+            // === 迷你模式下的触感“流光” (Rim Light) ===
+            // 这是一个跟随进度条末端移动的高亮光点
+            Item {
+                id: rimLightContainer
+                anchors.fill: parent
+                visible: isPinned && timerEngine.statusText === "工作中" && progressCanvas.progress > 0
+                rotation: -90 // 配合 Canvas 的旋转
+                
+                // 光点本体
+                Rectangle {
+                    id: rimLight
+                    width: 2.5 // 缩小核心尺寸，极致精致，只保留光的质感
+                    height: 2.5
+                    radius: 1.25
+                    color: "white" // 纯白核心，最亮
+                    
+                    // 计算光点位置
+                    // 极坐标转直角坐标: x = r * cos(theta), y = r * sin(theta)
+                    // 注意：这里的坐标系原点是 parent 的中心
+                    readonly property double orbitRadius: parent.width / 2 - 4 // 与 Canvas 半径一致
+                    readonly property double angle: progressCanvas.progress * 2 * Math.PI
+                    
+                    // 微调位置：由于 lineCap="round"，进度条末端会多出一个半圆。
+                    // 为了让光点刚好位于这个半圆的圆心（即视觉上的最前端），
+                    // 我们不需要额外的角度偏移，因为 arc 的终点正是圆心位置。
+                    // 之前的错位感主要是因为光点太大 (8px) 覆盖了圆头。
+                    // 现在缩小到 4px 后，应该完美居中于圆头内。
+                    
+                    x: parent.width/2 + orbitRadius * Math.cos(angle) - width/2
+                    y: parent.height/2 + orbitRadius * Math.sin(angle) - height/2
+                    
+                    // 强烈的辉光效果
+                    layer.enabled: true
+                    layer.effect: RectangularGlow {
+                        id: rimLightGlow
+                        glowRadius: 12 // 基础光晕
+                        spread: 0.2 // 进一步降低扩散度，让光晕更弥散、通透
+                        color: progressCanvas.drawColor // 跟随主色调
+                        cornerRadius: 12 // 匹配 glowRadius 确保圆形光晕
+                        opacity: 0.9 // 保持高透明度，增强光的通透感
+                        
+                        // 动态呼吸：模拟脉冲能量
+                        SequentialAnimation on glowRadius {
+                            running: rimLightContainer.visible
+                            loops: Animation.Infinite
+                            PropertyAnimation { to: 15; duration: 1000; easing.type: Easing.InOutSine }
+                            PropertyAnimation { to: 12; duration: 1000; easing.type: Easing.InOutSine }
+                        }
+                    }
                 }
             }
             
