@@ -30,6 +30,8 @@ Window {
     // Qt.FramelessWindowHint: 去除操作系统的标题栏和边框，完全自定义 UI。
     // Qt.Window: 这是一个顶级窗口。
     property bool isPinned: false
+    // 交互点坐标，用于粒子吸引效果
+    property point interactionPoint: Qt.point(width/2, height/2)
     flags: Qt.FramelessWindowHint | Qt.Window
 
     // ========================================================================
@@ -99,6 +101,9 @@ Window {
         onPressed: { lastMousePos = Qt.point(mouseX, mouseY); }
         
         onPositionChanged: {
+            // 更新交互点
+            mainWindow.interactionPoint = Qt.point(mouseX, mouseY)
+
             if (pressed) {
                 // 计算鼠标位移差量 (dx, dy)
                 var dx = mouseX - lastMousePos.x
@@ -278,6 +283,25 @@ Window {
                 xVariance: 30 
                 yVariance: 30 
                 pace: 100 
+            }
+
+            // 鼠标吸引器：仅在迷你模式下生效，让粒子向鼠标聚集
+            Attractor {
+                id: mouseAttractor
+                anchors.fill: parent
+                pointX: mainWindow.interactionPoint.x
+                pointY: mainWindow.interactionPoint.y
+                strength: 0 // 默认无吸引力
+                
+                // 当鼠标悬停在任意区域时触发 (包含中心圆环和边缘窗口)
+                states: State {
+                    when: isPinned && (windowMouseArea.containsMouse || centerMouseArea.containsMouse)
+                    PropertyChanges { target: mouseAttractor; strength: 5.0 } 
+                }
+                
+                transitions: Transition {
+                    NumberAnimation { property: "strength"; duration: 1000; easing.type: Easing.InOutQuad }
+                }
             }
         }
 
@@ -658,6 +682,10 @@ Window {
                 
                 property point lastPos
                 onPositionChanged: {
+                    // 更新交互点 (映射到窗口坐标)
+                    var p = mapToItem(mainWindow.contentItem, mouseX, mouseY)
+                    mainWindow.interactionPoint = p
+
                     if(pressed) {
                         var dx = mouseX - lastPos.x
                         var dy = mouseY - lastPos.y
