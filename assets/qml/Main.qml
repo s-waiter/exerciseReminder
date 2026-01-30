@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
+import QtQuick.Particles 2.0 // 引入粒子系统
 import QtQml 2.15 // 引入 Instantiator 等高级 QML 功能
 import QtGraphicalEffects 1.15 // 引入图形特效（如圆角裁剪、阴影、模糊）
 
@@ -229,6 +230,58 @@ Window {
         }
 
         // ========================================================================
+        // 4. 氛围粒子系统：Zen Mode
+        // ========================================================================
+        // 粒子行为保持恒定的平静状态，旨在提供一种宁静的陪伴感，
+        // 而不是通过紧迫感来催促用户。
+        ParticleSystem {
+            id: emotionParticles
+            anchors.fill: parent
+            // 仅在工作倒计时状态下运行
+            running: timerEngine.statusText === "工作中"
+            
+            // 始终保持平静的科技蓝/青色调，或者跟随主题色
+            property color particleColor: mainWindow.themeColor
+            
+            // 粒子画笔
+            ItemParticle {
+                delegate: Rectangle {
+                    width: Math.random() * 3 + 1 // 1-4px
+                    height: width
+                    radius: width / 2
+                    color: emotionParticles.particleColor
+                    opacity: 0.3 // 稍微降低不透明度，更加朦胧
+                }
+                fade: true
+            }
+
+            // 发射器
+            Emitter {
+                anchors.fill: parent
+                // 恒定低发射率，营造稀疏、空灵感
+                emitRate: 8 
+                lifeSpan: 4000 // 延长生命周期，让粒子飘得更久
+                size: 4
+                sizeVariation: 2
+                
+                velocity: AngleDirection {
+                    angleVariation: 360
+                    // 恒定低速，如水中浮游生物般缓慢
+                    magnitude: 20 
+                    magnitudeVariation: 10
+                }
+            }
+            
+            // 扰动场：轻微的气流感
+            Wander {
+                anchors.fill: parent
+                xVariance: 30 
+                yVariance: 30 
+                pace: 100 
+            }
+        }
+
+        // ========================================================================
         // 核心内容区
         // ========================================================================
         
@@ -439,46 +492,115 @@ Window {
                 }
             }
             
-            // 中心时间文字
-            Column {
+            // 状态容器：统一管理倒计时和透视信息的切换
+            Item {
+                id: infoCenterContainer
                 anchors.centerIn: parent
-                spacing: 5
+                width: parent.width
+                height: parent.height
                 
-                Text {
-                    // 使用 Math.floor 取整
-                    property int mins: Math.floor(timerEngine.remainingSeconds / 60)
-                    property int secs: timerEngine.remainingSeconds % 60
-                    // 补零格式化: 9:5 -> 09:05
-                    text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
-                    color: "#ffffff"
-                    font.pixelSize: isPinned ? 28 : 34 // 迷你模式下字体稍微加大，因为去掉了下面的文字
-                    font.family: "Segoe UI Light" // 细体字更有科技感
-                    font.weight: Font.Light
-                    anchors.horizontalCenter: parent.horizontalCenter
+                // 1. 默认状态：倒计时 (Countdown State)
+                Item {
+                    id: countdownState
+                    anchors.fill: parent
                     
-                    Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
-                }
-                
-                Text {
-                    text: timerEngine.statusText
-                    color: mainWindow.themeColor
-                    font.pixelSize: isPinned ? 10 : 12 // 动态字体大小
-                    font.bold: true
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    opacity: 0.8
-                    visible: !isPinned // 迷你模式下隐藏状态文字，让界面更清爽，只留数字
+                    // 当不在迷你模式下悬停时显示
+                    property bool active: !(isPinned && centerMouseArea.containsMouse)
                     
-                    Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
+                    opacity: active ? 1.0 : 0.0
+                    scale: active ? 1.0 : 0.8 // 退出时缩小，营造空间纵深感
+                    
+                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 5
+                        
+                        Text {
+                            id: countdownText
+                            // 使用 Math.floor 取整
+                            property int mins: Math.floor(timerEngine.remainingSeconds / 60)
+                            property int secs: timerEngine.remainingSeconds % 60
+                            // 补零格式化: 9:5 -> 09:05
+                            text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
+                            color: "#ffffff"
+                            font.pixelSize: isPinned ? 28 : 34 // 迷你模式下字体稍微加大，因为去掉了下面的文字
+                            font.family: "Segoe UI Light" // 细体字更有科技感
+                            font.weight: Font.Light
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            
+                            Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
+                        }
+                        
+                        Text {
+                            text: timerEngine.statusText
+                            color: mainWindow.themeColor
+                            font.pixelSize: isPinned ? 10 : 12 // 动态字体大小
+                            font.bold: true
+                            font.family: "Microsoft YaHei UI"
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            opacity: 0.8
+                            visible: !isPinned // 迷你模式下隐藏状态文字，让界面更清爽，只留数字
+                            
+                            Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
+                        }
+
+                        // 预计结束时间 (ETA) - 正常模式下显示
+                        Text {
+                            text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
+                            color: "#8899A6" // 弱化显示
+                            font.pixelSize: 12
+                            font.family: "Microsoft YaHei UI"
+                            // 在迷你模式下隐藏，避免遮挡和拥挤，保持界面清爽
+                            visible: !isPinned && timerEngine.statusText === "工作中"
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
                 }
 
-                // 预计结束时间 (ETA)
-                Text {
-                    text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
-                    color: "#8899A6" // 弱化显示
-                    font.pixelSize: 12
-                    // 在迷你模式下隐藏，避免遮挡和拥挤，保持界面清爽
-                    visible: !isPinned && timerEngine.statusText === "工作中"
-                    anchors.horizontalCenter: parent.horizontalCenter
+                // 2. 透视状态：预计休息时间 (Smart Peek State)
+                Item {
+                    id: peekState
+                    anchors.fill: parent
+                    
+                    // 仅在迷你模式且悬停时显示
+                    property bool active: isPinned && centerMouseArea.containsMouse
+                    
+                    opacity: active ? 1.0 : 0.0
+                    scale: active ? 1.0 : 1.1 // 进入时从 1.1 缩小到 1.0，营造浮现聚焦感
+                    visible: opacity > 0 // 优化性能
+                    
+                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 0 // 紧凑布局
+                        
+                        // Hero: 时间
+                        Text {
+                            text: timerEngine.estimatedFinishTime
+                            color: "#ffffff" // 纯白高亮
+                            font.pixelSize: 24
+                            font.family: "Segoe UI"
+                            font.styleName: "Semibold" // 确保数字清晰有力
+                            font.weight: Font.DemiBold
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                        
+                        // Label: 说明
+                        Text {
+                            text: "预计休息"
+                            color: mainWindow.themeColor // 跟随动态主题色
+                            font.pixelSize: 10
+                            font.family: "Microsoft YaHei UI" // 强制使用微软雅黑，拒绝宋体
+                            font.bold: true
+                            font.letterSpacing: 2 // 增加字间距，提升精致感
+                            opacity: 0.9
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
                 }
             }
 
