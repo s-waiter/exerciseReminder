@@ -40,7 +40,6 @@ Window {
             raise()          // 提升窗口层级
             // 重启动画
             mainEntranceAnim.restart()
-            bgAnim.restart()
         } else {
             // 隐藏时重置状态
             feedbackText = ""
