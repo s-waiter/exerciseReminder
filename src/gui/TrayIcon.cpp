@@ -14,30 +14,30 @@ TrayIcon::TrayIcon(QObject *parent) : QObject(parent)
     // 创建右键菜单
     m_menu = new QMenu();
     
-    // 美化右键菜单 (深色极简风)
+    // 美化右键菜单 (深色极简风 - 统一主界面风格)
     m_menu->setStyleSheet(
         "QMenu {"
-        "   background-color: #2b2b2b;"
-        "   border: 1px solid #3f3f3f;"
+        "   background-color: #243B55;"  // 统一主界面深蓝背景
+        "   border: 1px solid #00d2ff;"  // 统一主界面科技蓝边框
         "   border-radius: 8px;"
         "   padding: 5px;"
         "}"
         "QMenu::item {"
         "   background-color: transparent;"
-        "   color: #f0f0f0;"
+        "   color: #ffffff;"             // 纯白文字
         "   padding: 8px 20px;"
         "   border-radius: 4px;"
         "   font-family: 'Microsoft YaHei UI', 'Segoe UI';"
         "   font-size: 10pt;"
         "}"
         "QMenu::item:selected {"
-        "   background-color: #00d2ff;"
+        "   background-color: #00d2ff;"  // 选中高亮色保持一致
         "   color: #000000;"
         "   font-weight: bold;"
         "}"
         "QMenu::separator {"
         "   height: 1px;"
-        "   background: #555555;"
+        "   background: rgba(255, 255, 255, 0.2);" // 半透明分割线
         "   margin: 4px 10px;"
         "}"
     );
