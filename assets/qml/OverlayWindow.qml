@@ -51,6 +51,18 @@ Window {
     property alias currentTheme: overlayWin.themeData
 
     // -------------------------------------------------------------------------
+    // 交互层 (Interaction)
+    // -------------------------------------------------------------------------
+    // 全屏鼠标追踪 (用于视差特效)
+    MouseArea {
+        id: mouseTracker
+        anchors.fill: parent
+        hoverEnabled: true // 启用悬停检测
+        acceptedButtons: Qt.NoButton // 不拦截点击，让点击穿透到下面的按钮
+        z: 1000 // 放在最上层以捕获所有鼠标移动 (但 acceptedButtons: NoButton 会让点击穿透)
+    }
+
+    // -------------------------------------------------------------------------
     // UI 实现
     // -------------------------------------------------------------------------
 
@@ -85,12 +97,44 @@ Window {
         visible: overlayWin.feedbackText !== "" // 只有有反馈文本时才显示
         z: 999 // 确保最顶层
 
-        // 1. 背景模糊与变暗
+        // 1. 背景模糊与变暗 (沉浸式呼吸 + 视差)
         Rectangle {
+            id: immersiveBg
             anchors.fill: parent
             color: "#CC000510" // 80% 不透明度的深色背景
-            opacity: feedbackLayer.visible ? 1.0 : 0.0
+            
+            // 呼吸因子 (0.85 ~ 1.0)
+            property real breathingFactor: 1.0
+            
+            // 最终透明度 = 显隐状态 * 呼吸因子
+            opacity: (feedbackLayer.visible ? 1.0 : 0.0) * breathingFactor
             Behavior on opacity { NumberAnimation { duration: 500 } }
+
+            // 初始放大，防止视差移动露出边缘
+            scale: 1.05
+            
+            // 视差特效：跟随鼠标反向微动 (0.01系数)
+            transform: Translate {
+                x: (overlayWin.width/2 - mouseTracker.mouseX) * 0.01
+                y: (overlayWin.height/2 - mouseTracker.mouseY) * 0.01
+            }
+
+            // 沉浸式呼吸动画 (4秒吸 4秒呼)
+            ParallelAnimation {
+                running: feedbackLayer.visible
+                loops: Animation.Infinite
+                
+                // 缩放呼吸 (1.05 -> 1.10)
+                SequentialAnimation {
+                    NumberAnimation { target: immersiveBg; property: "scale"; to: 1.10; duration: 4000; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: immersiveBg; property: "scale"; to: 1.05; duration: 4000; easing.type: Easing.InOutSine }
+                }
+                // 明暗呼吸 (呼吸因子 1.0 -> 0.85)
+                SequentialAnimation {
+                    NumberAnimation { target: immersiveBg; property: "breathingFactor"; to: 0.85; duration: 4000; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: immersiveBg; property: "breathingFactor"; to: 1.0; duration: 4000; easing.type: Easing.InOutSine }
+                }
+            }
         }
 
         MouseArea { anchors.fill: parent } // 阻止交互，强制观看结算动画
@@ -552,6 +596,16 @@ Window {
     Rectangle {
         id: bg
         anchors.fill: parent
+        // 初始放大一点，防止视差移动时露出边缘
+        scale: 1.05 
+        
+        // 视差特效 (Parallax Effect)
+        // 让背景跟随鼠标反向微动，增加深邃感
+        transform: Translate {
+            x: (overlayWin.width/2 - mouseTracker.mouseX) * 0.01
+            y: (overlayWin.height/2 - mouseTracker.mouseY) * 0.01
+        }
+
         gradient: Gradient {
             GradientStop { 
                 position: 0.0 
@@ -565,19 +619,22 @@ Window {
             }
         }
         
-        // 背景呼吸效果
-        SequentialAnimation on opacity {
-            id: bgAnim
+        // 沉浸式呼吸 (Immersive Breathing)
+        // 4秒一吸，4秒一呼，配合不透明度变化
+        ParallelAnimation {
+            running: overlayWin.visible
             loops: Animation.Infinite
-            NumberAnimation {
-                from: 0.9
-                to: 1.0
-                duration: 3000
+            
+            // 呼吸缩放 (1.05 -> 1.10 -> 1.05)
+            SequentialAnimation {
+                NumberAnimation { target: bg; property: "scale"; to: 1.10; duration: 4000; easing.type: Easing.InOutSine }
+                NumberAnimation { target: bg; property: "scale"; to: 1.05; duration: 4000; easing.type: Easing.InOutSine }
             }
-            NumberAnimation {
-                from: 1.0
-                to: 0.9
-                duration: 3000
+            
+            // 呼吸明暗
+            SequentialAnimation {
+                NumberAnimation { target: bg; property: "opacity"; to: 0.85; duration: 4000; easing.type: Easing.InOutSine }
+                NumberAnimation { target: bg; property: "opacity"; to: 1.0; duration: 4000; easing.type: Easing.InOutSine }
             }
         }
     }
@@ -586,6 +643,11 @@ Window {
     ParticleSystem {
         id: particles
         anchors.fill: parent
+        // 视差特效 (层级更深，移动稍快，营造立体感)
+        transform: Translate {
+            x: (overlayWin.width/2 - mouseTracker.mouseX) * 0.03
+            y: (overlayWin.height/2 - mouseTracker.mouseY) * 0.03
+        }
         running: overlayWin.visible
         z: 0 
         
