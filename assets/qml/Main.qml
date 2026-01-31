@@ -242,8 +242,8 @@ Window {
         ParticleSystem {
             id: emotionParticles
             anchors.fill: parent
-            // 仅在工作倒计时状态下运行
-            running: timerEngine.statusText === "工作中"
+            // 始终运行，不受暂停状态影响
+            running: true
             
             // 始终保持平静的科技蓝/青色调，或者跟随主题色
             property color particleColor: mainWindow.themeColor
