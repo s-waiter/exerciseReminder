@@ -2,30 +2,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Download, ChevronRight, PlayCircle, AlertTriangle, Clock, Activity, Coffee } from 'lucide-react';
 import ParticleBackground from './ParticleBackground';
+import { useVersionInfo } from '../hooks/useVersionInfo';
 
 const Hero = () => {
-  const [downloadUrl, setDownloadUrl] = React.useState("#");
-  const [version, setVersion] = React.useState("v1.0");
-
-  React.useEffect(() => {
-    fetch('/version.json')
-      .then(res => res.json())
-      .then(data => {
-        if (data.latest_version && data.download_url) {
-           setVersion(`v${data.latest_version}`);
-           // Extract filename from full URL if needed, or use the full URL
-           // The data.download_url from generate_version_json is "http://HOSTNAME/updates/FILENAME"
-           // But for the main download button, we might want the local path "/downloads/FILENAME" 
-           // or just use the full URL. Full URL is safer if hosted elsewhere, 
-           // but "http://47.101.52.0/updates/..." might be slow if not CDN. 
-           // Better to use relative path if possible. 
-           // Let's rely on the fact that setup_remote.sh copies zip to /downloads/
-           const filename = data.download_url.split('/').pop();
-           setDownloadUrl(`/downloads/${filename}`);
-        }
-      })
-      .catch(err => console.error("Failed to fetch version info:", err));
-  }, []);
+  const { version, downloadUrl } = useVersionInfo();
 
   return (
     <div id="home" className="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden min-h-[90vh] flex flex-col justify-center">

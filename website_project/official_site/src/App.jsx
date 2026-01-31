@@ -5,8 +5,11 @@ import Features from './components/Features';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import { Download, ShieldAlert, Info } from 'lucide-react';
+import { useVersionInfo } from './hooks/useVersionInfo';
 
 function App() {
+  const { version, downloadUrl } = useVersionInfo();
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-teal-500 selection:text-white">
       <Navbar />
@@ -35,10 +38,10 @@ function App() {
                <div className="border-t border-slate-800 my-5"></div>
                
                {/* Main Download Button */}
-               <a href="/downloads/DeskCare_v1.0.zip" download className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-teal-900/50 group">
+               <a href={downloadUrl} download className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-teal-900/50 group">
                  <Download size={20} className="group-hover:animate-bounce" />
                  <span>下载完整版 (.zip)</span>
-                 <span className="bg-teal-700/50 text-xs py-0.5 px-2 rounded ml-1 border border-teal-500/30">v1.0</span>
+                 <span className="bg-teal-700/50 text-xs py-0.5 px-2 rounded ml-1 border border-teal-500/30">{version}</span>
                </a>
                
                <p className="text-xs text-gray-500 mt-4 text-center flex items-center justify-center gap-2">

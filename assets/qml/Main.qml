@@ -276,24 +276,24 @@ Window {
                 anchors.topMargin: 10
                 spacing: 5
                 
-                // 设置按钮 (已移除，版本号移至右下角)
-                /*
+                // 设置按钮
                 Button {
                     id: settingsBtn
-                    width: 30
+                    width: 30 // 恢复为 30 以便与关闭按钮高度对齐 (视觉中心对齐)
                     height: 30
                     visible: !mainWindow.isPinned // 迷你模式下隐藏
                     background: Rectangle { color: "transparent" }
                     contentItem: Text {
                         text: "⚙" // Gear icon
                         color: "white"
-                        font.pixelSize: 18
+                        font.pixelSize: 15 // 保持精致的字号
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
+                        opacity: settingsBtn.hovered ? 1.0 : 0.6
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
-                    onClicked: settingsPopup.open()
+                    onClicked: settingsOverlay.open()
                 }
-                */
 
                 // 关闭/隐藏按钮
                 Button {
@@ -849,7 +849,7 @@ Window {
                 // 间隔设置卡片
                 Rectangle {
                     id: intervalCard
-                    width: 60
+                    width: 95 // 增加宽度
                     height: 40
                     color: "#1Affffff"
                     radius: 10
@@ -955,7 +955,7 @@ Window {
                 // 午休助眠卡片
                 Rectangle {
                     id: napCard
-                    width: 60
+                    width: 95 // 增加宽度
                     height: 40
                     color: "#1Affffff"
                     radius: 10
@@ -989,64 +989,6 @@ Window {
                         
                         Text {
                             text: "午休助眠"
-                            color: "#8899A6"
-                            font.pixelSize: 10
-                            anchors.horizontalCenter: parent.horizontalCenter
-                        }
-                    }
-                }
-
-                // 开机自启卡片 (极简 Switch 风格)
-                Rectangle {
-                    id: autoStartCard
-                    width: 60
-                    height: 40
-                    color: "#1Affffff"
-                    radius: 10
-                    border.color: autoStartMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
-                    border.width: 1
-                    
-                    // 悬停缩放效果
-                    scale: autoStartMouseArea.containsMouse ? 1.05 : 1.0
-                    Behavior on scale { NumberAnimation { duration: 100 } }
-
-                    MouseArea {
-                        id: autoStartMouseArea
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: appConfig.autoStart = !appConfig.autoStart
-                    }
-                    
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 2 // 统一间距为 2
-                        
-                        // 自定义简约 Switch 控件
-                        Rectangle {
-                            width: 30 // 缩小宽度
-                            height: 16 // 缩小高度至 16px 以匹配左侧文字
-                            radius: 8
-                            color: appConfig.autoStart ? mainWindow.themeColor : "#33ffffff"
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                            
-                            // 滑块
-                            Rectangle {
-                                width: 12 // 缩小滑块
-                                height: 12
-                                radius: 6
-                                color: "white"
-                                anchors.verticalCenter: parent.verticalCenter
-                                // 根据开关状态计算 x 坐标
-                                x: appConfig.autoStart ? parent.width - width - 2 : 2
-                                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
-                            }
-                        }
-                        
-                        Text {
-                            text: "开机自启"
                             color: "#8899A6"
                             font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1500,6 +1442,139 @@ Window {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ========================================================================
+    // 设置弹窗 (Settings Overlay)
+    // ========================================================================
+    // 采用与 UpdateDialog 完全一致的视觉风格
+    Item {
+        id: settingsOverlay
+        anchors.fill: parent
+        visible: false
+        z: 200 // 确保在最上层
+        
+        function open() { visible = true }
+        function close() { visible = false }
+
+        // 点击背景关闭
+        MouseArea {
+            anchors.fill: parent
+            onClicked: settingsOverlay.close()
+        }
+        
+        Rectangle {
+            id: settingsDialog
+            anchors.centerIn: parent
+            width: 200 
+            height: 140 
+            radius: 16 
+            color: "#F01B2A4E" // 增加不透明度，提升质感
+            border.color: settingsDialogMouseArea.containsMouse ? 
+                          Qt.lighter(mainWindow.themeColor, 1.3) : 
+                          Qt.rgba(mainWindow.themeColor.r, mainWindow.themeColor.g, mainWindow.themeColor.b, 0.3)
+            border.width: 1
+            
+            // 悬浮放大特效
+            scale: settingsDialogMouseArea.containsMouse ? 1.05 : 1.0
+            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
+            Behavior on border.color { ColorAnimation { duration: 200 } }
+
+            // 玻璃拟态光效 (顶部高光)
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Qt.rgba(1, 1, 1, 0.2)
+                anchors.top: parent.top
+                anchors.topMargin: 1
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            
+            // 阻止点击穿透 + 悬浮检测
+            MouseArea {
+                id: settingsDialogMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: {} // 拦截点击
+            }
+            
+            // 内容
+            Column {
+                anchors.centerIn: parent
+                width: parent.width - 30
+                spacing: 15
+                
+                Text {
+                    text: "偏好设置"
+                    color: "white"
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                
+                // 分割线
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#22ffffff"
+                }
+                
+                // 开机自启开关
+                Item {
+                    width: parent.width
+                    height: 30
+                    
+                    Text {
+                        text: "开机自启"
+                        color: "#DDDDDD"
+                        font.pixelSize: 12
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: -6 // 向上微调 2px 以视觉对齐右侧开关
+                    }
+                    
+                    Switch {
+                        checked: appConfig.autoStart
+                        onToggled: appConfig.autoStart = checked
+                        
+                        scale: 0.7 // 稍微缩小开关以适应紧凑布局
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        
+                        indicator: Rectangle {
+                            implicitWidth: 40
+                            implicitHeight: 20
+                            radius: 10
+                            color: parent.checked ? mainWindow.themeColor : "#33ffffff"
+                            border.color: parent.checked ? mainWindow.themeColor : "#cccccc"
+                            
+                            Rectangle {
+                                x: parent.parent.checked ? parent.width - width - 2 : 2
+                                width: 16
+                                height: 16
+                                radius: 8
+                                color: "white"
+                                anchors.verticalCenter: parent.verticalCenter
+                                Behavior on x { NumberAnimation { duration: 100 } }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 进入动画
+            onVisibleChanged: {
+                if (visible) {
+                    enterAnim.restart()
+                }
+            }
+            
+            ParallelAnimation {
+                id: enterAnim
+                NumberAnimation { target: settingsDialog; property: "opacity"; from: 0.0; to: 1.0; duration: 200 }
+                NumberAnimation { target: settingsDialog; property: "scale"; from: 0.9; to: 1.0; duration: 200; easing.type: Easing.OutBack }
             }
         }
     }

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Menu, X } from 'lucide-react';
+import { useVersionInfo } from '../hooks/useVersionInfo';
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { downloadUrl } = useVersionInfo();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,7 +48,7 @@ const Navbar = () => {
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-400 transition-all group-hover:w-full"></span>
             </a>
             
-            <a href="/downloads/DeskCare_v1.0.zip" download className="relative inline-flex items-center gap-2 px-5 py-2 rounded-full bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 hover:text-teal-300 text-sm font-medium transition-all border border-teal-500/20 hover:border-teal-500/50 backdrop-blur-sm">
+            <a href={downloadUrl} download className="relative inline-flex items-center gap-2 px-5 py-2 rounded-full bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 hover:text-teal-300 text-sm font-medium transition-all border border-teal-500/20 hover:border-teal-500/50 backdrop-blur-sm">
               <Download size={16} />
               <span>下载客户端</span>
             </a>
@@ -70,7 +72,7 @@ const Navbar = () => {
           <a href="#" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">首页</a>
           <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">特性</a>
           <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">常见问题</a>
-          <a href="/downloads/DeskCare_v1.0.zip" download className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white justify-center">
+          <a href={downloadUrl} download className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white justify-center">
             <Download size={16} />
             <span>下载客户端</span>
           </a>

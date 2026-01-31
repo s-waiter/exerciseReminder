@@ -1,7 +1,9 @@
 import React from 'react';
 import { Heart, Github } from 'lucide-react';
+import { useVersionInfo } from '../hooks/useVersionInfo';
 
 const Footer = () => {
+  const { version } = useVersionInfo();
   return (
     <footer className="bg-slate-950 border-t border-slate-900">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -9,7 +11,7 @@ const Footer = () => {
           <div className="flex flex-col mb-4 md:mb-0">
              <div className="flex items-center">
                <span className="text-xl font-bold text-gray-200">DeskCare</span>
-               <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-900/30 text-teal-400 text-xs font-mono">v1.0.0</span>
+               <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-900/30 text-teal-400 text-xs font-mono">{version}</span>
              </div>
              <p className="text-slate-500 text-sm mt-1">
                 为久坐者而生，愿你拥有健康的颈椎与明亮的双眼。
