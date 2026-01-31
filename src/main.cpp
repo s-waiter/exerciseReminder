@@ -6,6 +6,7 @@
 #include "core/AppConfig.h"
 #include "core/TimerEngine.h"
 #include "core/UpdateManager.h"
+#include "core/StatisticsManager.h"
 #include "gui/TrayIcon.h"
 #include "utils/WindowUtils.h"
 
@@ -86,9 +87,13 @@ int main(int argc, char *argv[])
     
     TimerEngine timerEngine; // 计时器逻辑核心
     UpdateManager updateManager; // 更新管理器
+    StatisticsManager statsManager; // 用户统计管理器
     TrayIcon trayIcon(&timerEngine, &updateManager);       // 系统托盘图标控制
     AppConfig appConfig;     // 配置管理 (读写注册表/配置文件)
     WindowUtils windowUtils; // 窗口工具 (处理置顶等原生 API)
+
+    // 启动时上报用户活跃数据 (DAU)
+    statsManager.reportStartup();
 
     // ========================================================================
     // 4. 连接 C++ 内部信号与槽 (Signals & Slots)

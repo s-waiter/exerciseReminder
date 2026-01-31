@@ -11,6 +11,7 @@ SOURCES += \
     src/core/AppConfig.cpp \
     src/utils/WindowUtils.cpp \
     src/core/UpdateManager.cpp \
+    src/core/StatisticsManager.cpp \
     src/core/Version.cpp
 
 HEADERS += \
@@ -19,6 +20,7 @@ HEADERS += \
     src/core/AppConfig.h \
     src/utils/WindowUtils.h \
     src/core/UpdateManager.h \
+    src/core/StatisticsManager.h \
     src/core/Version.h
 
 RESOURCES += resources.qrc
