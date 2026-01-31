@@ -71,6 +71,10 @@ dist_release/
 # VS Code
 .vscode/
 *.code-workspace
+.history/
+
+# JetBrains / IntelliJ
+.idea/
 
 # Windows
 Thumbs.db
@@ -85,4 +89,25 @@ $RECYCLE.BIN/
 
 # Node.js
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+
+# Temporary
+tmp/
+temp/
+
+# Note: chat_history/ and chat_logs/ are explicitly tracked by user request.
