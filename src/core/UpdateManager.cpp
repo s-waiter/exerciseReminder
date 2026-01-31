@@ -14,8 +14,12 @@
 // Config
 const QString UPDATE_URL = "http://47.101.52.0/updates/version.json";
 
+#include <QNetworkProxy>
+
 UpdateManager::UpdateManager(QObject *parent) : QObject(parent), m_networkManager(new QNetworkAccessManager(this)), m_currentReply(nullptr)
 {
+    // Disable proxy to speed up connection (avoids Windows auto-detect delay)
+    m_networkManager->setProxy(QNetworkProxy::NoProxy);
 }
 
 void UpdateManager::checkForUpdates(bool silent)
@@ -30,6 +34,7 @@ void UpdateManager::checkForUpdates(bool silent)
     QUrl url(UPDATE_URL);
     QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork); // Disable cache
+    request.setTransferTimeout(5000); // 5 seconds timeout
     
     m_currentReply = m_networkManager->get(request);
     connect(m_currentReply, &QNetworkReply::finished, this, &UpdateManager::onVersionCheckFinished);
