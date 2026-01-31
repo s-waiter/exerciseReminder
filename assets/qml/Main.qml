@@ -740,13 +740,25 @@ Window {
                     onTriggered: mainWindow.isPinned = !mainWindow.isPinned
                 }
                 
+                // 3. 三击动作延迟计时器 (用于等待可能的第四次点击)
+                Timer {
+                    id: tripleClickActionTimer
+                    interval: 250 // 延迟 250ms 执行三击动作
+                    repeat: false
+                    onTriggered: {
+                        // 触发立即休息
+                        themeController.generateRandomTheme()
+                        isReminderActive = true
+                    }
+                }
+                
                 onPressed: {
                     clickPos = Qt.point(mouseX, mouseY)
                     isDrag = false
                     // lastPos 用于计算位移增量
                     lastPos = Qt.point(mouseX, mouseY)
                     
-                    // === 三击检测逻辑 ===
+                    // === 多击检测逻辑 ===
                     clickCount++
                     clickCountResetTimer.restart() // 每次点击刷新重置计时器
                     
@@ -755,11 +767,17 @@ Window {
                         // 1. 阻止即将发生的双击动作 (切换模式)
                         doubleClickActionTimer.stop()
                         
-                        // 2. 触发立即休息
-                        themeController.generateRandomTheme()
-                        isReminderActive = true
+                        // 2. 启动三击延迟，等待可能的第四击
+                        tripleClickActionTimer.start()
                         
                         // 注意：此处不立即重置 clickCount，以便 onClicked 中能检测到 clickCount >= 3
+                    } else if (clickCount === 4) {
+                        // 检测到四击：
+                        // 1. 阻止三击动作
+                        tripleClickActionTimer.stop()
+                        
+                        // 2. 触发午休模式
+                        timerEngine.startNap()
                     }
                 }
                 
