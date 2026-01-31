@@ -2,32 +2,51 @@
 #include <QObject>
 #include <QSystemTrayIcon>
 #include <QMenu>
+#include <QAction>
+#include "../core/TimerEngine.h"
+#include "../core/UpdateManager.h" // Include UpdateManager
 
-// 托盘图标管理器：负责系统托盘的显示、菜单交互
-class TrayIcon : public QObject
-{
+class TrayIcon : public QObject {
     Q_OBJECT
+
 public:
-    explicit TrayIcon(QObject *parent = nullptr);
-    
-    // 显示气泡消息
-    void showMessage(const QString &title, const QString &msg);
+    explicit TrayIcon(TimerEngine *timerEngine, QObject *parent = nullptr);
+    ~TrayIcon();
+
+    void showMessage(const QString &title, const QString &message);
 
 signals:
-    // 请求显示主设置界面
     void showSettingsRequested();
-    // 请求退出程序
-    void quitRequested();
-
-public slots:
-    // 更新鼠标悬停时的提示文本
-    void updateToolTip(const QString &text);
 
 private slots:
-    // 处理托盘激活事件（单击、双击）
     void onActivated(QSystemTrayIcon::ActivationReason reason);
+    void updateMenuState();
+    
+    // Update slots
+    void onCheckUpdate();
+    void onUpdateAvailable(const QString &version, const QString &changelog, const QString &url);
+    void onNoUpdateAvailable();
+    void onUpdateError(const QString &error);
+    void onDownloadProgress(qint64 received, qint64 total);
+    void onDownloadFinished(const QString &filePath);
 
 private:
     QSystemTrayIcon *m_trayIcon;
-    QMenu *m_menu;
+    QMenu *m_trayMenu;
+    TimerEngine *m_timerEngine;
+    UpdateManager *m_updateManager; // Manager instance
+
+    QAction *m_startAction;
+    QAction *m_pauseAction;
+    QAction *m_skipAction;
+    QAction *m_resetAction;
+    QAction *m_quitAction;
+    QAction *m_settingsAction;
+    QAction *m_checkUpdateAction; // New action
+
+    void createMenu();
+    void setupConnections();
+    
+    // Helper to launch updater
+    void launchUpdater(const QString &zipPath);
 };

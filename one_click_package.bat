@@ -1,77 +1,136 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-:: ==========================================
-:: One-Click Package Script
-:: ==========================================
-
-echo [INIT] Initializing environment...
-
-:: 1. Auto-configure Qt Environment
-set "QT_BIN_DIR=D:\Qt\5.15.2\msvc2015_64\bin"
-
-if not exist "%QT_BIN_DIR%\windeployqt.exe" (
-    echo [ERROR] Qt environment not found.
-    echo Expected path: %QT_BIN_DIR%
-    echo Please check your Qt installation.
-    pause
-    exit /b 1
-)
-
-:: Add Qt bin to PATH
-set "PATH=%QT_BIN_DIR%;%PATH%"
-echo [OK] Qt environment configured.
-
-:: 2. Set Project Paths
+:: Change to script directory
 cd /d "%~dp0"
-set "PROJECT_ROOT=%CD%"
-:: NOTE: If you are using a shadow build (default in Qt Creator), update this path to point to your actual build directory.
-:: E.g., ..\build-DeskCare-Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release
-set "BUILD_DIR=%PROJECT_ROOT%\build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release"
-set "EXE_NAME=DeskCare.exe"
-set "DIST_DIR=%PROJECT_ROOT%\dist"
-set "QML_DIR=%PROJECT_ROOT%\assets\qml"
-set "ZIP_NAME=DeskCare_v1.0.zip"
 
-:: 3. Check Release File
-echo [CHECK] Checking for executable...
-if not exist "%BUILD_DIR%\%EXE_NAME%" (
-    echo [ERROR] Release executable not found.
-    echo Path: "%BUILD_DIR%\%EXE_NAME%"
-    echo Please build the project in Release mode first.
+:: 0. Version Management
+echo [VERSION] Checking version...
+"C:\Users\admin\anaconda3\python.exe" scripts/manage_version.py
+echo.
+set /p DO_BUMP="Do you want to bump the version? (Y/N): "
+if /i "%DO_BUMP%"=="Y" (
+    "C:\Users\admin\anaconda3\python.exe" scripts/manage_version.py bump
+    if !ERRORLEVEL! NEQ 0 (
+        echo [ERROR] Version bump failed.
+        pause
+        exit /b 1
+    )
+    echo [VERSION] Bumped.
+)
+
+:: 1. Setup Build Environment
+echo [ENV] Setting up build environment...
+
+:: 1.1 Visual Studio (Using VS2022 Community path found on system)
+:: Note: Using MSVC 2015 compatible toolchain (amd64)
+if exist "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" (
+    call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+) else (
+    echo [ERROR] Visual Studio environment file not found.
+    echo Please check your VS installation path.
     pause
     exit /b 1
 )
 
-:: 4. Prepare Dist Directory
-echo [STEP] Cleaning and creating dist directory...
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Failed to setup VS environment.
+    pause
+    exit /b 1
+)
+
+:: 1.2 Qt
+set "QT_BIN_DIR=D:\Qt\5.15.2\msvc2015_64\bin"
+if not exist "%QT_BIN_DIR%" (
+    echo [ERROR] Qt not found at %QT_BIN_DIR%
+    pause
+    exit /b 1
+)
+set "PATH=%QT_BIN_DIR%;%PATH%"
+
+:: 2. Build Updater
+echo [BUILD] Building Updater...
+cd src\updater
+if exist "Makefile" nmake distclean
+call qmake updater.pro
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] qmake for Updater failed.
+    pause
+    exit /b 1
+)
+call nmake release
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] nmake for Updater failed.
+    pause
+    exit /b 1
+)
+cd ..\..
+
+:: 3. Build DeskCare
+echo [BUILD] Building DeskCare...
+set "BUILD_ROOT=build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release"
+if not exist "%BUILD_ROOT%" mkdir "%BUILD_ROOT%"
+cd "%BUILD_ROOT%"
+
+:: Clean old executable to ensure we're not packaging stale file
+if exist "release\DeskCare.exe" del "release\DeskCare.exe"
+:: Optional: clean makefile to ensure fresh build config
+if exist "Makefile" nmake distclean
+
+call qmake "..\..\DeskCare.pro" -spec win32-msvc
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] qmake for DeskCare failed.
+    pause
+    exit /b 1
+)
+call nmake release
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] nmake for DeskCare failed.
+    pause
+    exit /b 1
+)
+cd ..\..
+
+:: 4. Prepare Dist
+echo [DIST] Preparing distribution...
+set "DIST_DIR=dist"
 if exist "%DIST_DIR%" rmdir /s /q "%DIST_DIR%"
 mkdir "%DIST_DIR%"
 
-:: 5. Copy Executable
-echo [STEP] Copying executable...
-copy "%BUILD_DIR%\%EXE_NAME%" "%DIST_DIR%" >nul
-
-:: 6. Run windeployqt
-echo [STEP] Deploying dependencies (windeployqt)...
-:: Added --no-compiler-runtime to suppress VCINSTALLDIR warning since we are not in a VS command prompt
-call windeployqt --qmldir "%QML_DIR%" --no-compiler-runtime --dir "%DIST_DIR%" "%DIST_DIR%\%EXE_NAME%" >nul
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Dependency deployment failed.
+:: 5. Copy Files
+echo [COPY] Copying executables...
+if exist "%BUILD_ROOT%\release\DeskCare.exe" (
+    copy "%BUILD_ROOT%\release\DeskCare.exe" "%DIST_DIR%" >nul
+) else (
+    echo [ERROR] DeskCare.exe not found in build output.
     pause
     exit /b 1
 )
 
-:: 7. Clean up junk files (Optional)
+if exist "src\updater\release\Updater.exe" (
+    copy "src\updater\release\Updater.exe" "%DIST_DIR%" >nul
+) else (
+    echo [ERROR] Updater.exe not found in build output.
+    pause
+    exit /b 1
+)
+
+:: 6. Deploy Qt Dependencies
+echo [DEPLOY] Running windeployqt...
+call windeployqt --qmldir "assets\qml" --no-compiler-runtime --dir "%DIST_DIR%" "%DIST_DIR%\DeskCare.exe" >nul
+:: Run for Updater to ensure widgets dependencies are present
+call windeployqt --no-compiler-runtime --dir "%DIST_DIR%" "%DIST_DIR%\Updater.exe" >nul
+
+:: 7. Cleanup Junk
+echo [CLEAN] Removing junk files...
 del "%DIST_DIR%\*.pdb" >nul 2>nul
 del "%DIST_DIR%\*.obj" >nul 2>nul
 del "%DIST_DIR%\*.cpp" >nul 2>nul
 del "%DIST_DIR%\*.h" >nul 2>nul
 
-:: 8. Auto-Zip & Update Website
-echo [STEP] Compressing and Updating Website Resources...
+:: 8. Package Zip
+echo [PACK] Creating Zip...
 "C:\Users\admin\anaconda3\python.exe" package_zip.py
-
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Packaging failed.
     pause
@@ -79,39 +138,14 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo ==========================================
-echo [SUCCESS] Packaging Completed!
-echo ==========================================
-echo.
-echo Generated file: %PROJECT_ROOT%\%ZIP_NAME%
+echo [SUCCESS] Build and Packaging Completed!
 echo.
 
-:: 10. Auto Deploy Option
-set /p DEPLOY_NOW="Do you want to deploy the new version to the website now? (Y/N): "
+:: 9. Auto Deploy Option
+set /p DEPLOY_NOW="Do you want to deploy to server? (Y/N): "
 if /i "%DEPLOY_NOW%"=="Y" (
-    echo.
-    echo [DEPLOY] Starting deployment sequence...
-    
-    echo [DEPLOY] Building website (npm run build)...
-    cd /d "%PROJECT_ROOT%\website_project\official_site"
-    call npm run build
-    
-    echo [DEPLOY] Uploading to server...
-    cd /d "%PROJECT_ROOT%\website_project"
-    "C:\Users\admin\anaconda3\python.exe" deploy.py
-    
-    if !ERRORLEVEL! EQU 0 (
-        echo.
-        echo [SUCCESS] Website updated and deployed successfully!
-    ) else (
-        echo.
-        echo [ERROR] Deployment failed.
-    )
-    
-    cd /d "%PROJECT_ROOT%"
-) else (
-    echo You can deploy later by running: python website_project\deploy.py
+    echo [DEPLOY] Starting deployment...
+    "C:\Users\admin\anaconda3\python.exe" website_project/deploy.py
 )
 
-echo.
 pause

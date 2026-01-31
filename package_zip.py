@@ -2,6 +2,22 @@ import zipfile
 import os
 import shutil
 import sys
+import json
+
+# Read version from version_info.json
+def get_version():
+    json_path = os.path.join(os.path.dirname(__file__), "version_info.json")
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as f:
+            v = json.load(f)
+            return f"{v['major']}.{v['minor']}.{v['patch']}"
+    return "1.0.0"
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+DIST_DIR = os.path.join(PROJECT_ROOT, "dist")
+VERSION = get_version()
+ZIP_NAME = f"DeskCare_v{VERSION}.zip"
+ZIP_PATH = os.path.join(PROJECT_ROOT, ZIP_NAME)
 
 def zip_directory(directory_path, zip_path):
     print(f"Compressing {directory_path} to {zip_path}...")
@@ -21,7 +37,8 @@ def main():
     # But for simplicity, let's assume it's run from project root as per bat script
     project_root = os.getcwd()
     dist_dir = os.path.join(project_root, "dist")
-    zip_name = "DeskCare_v1.0.zip"
+    # Use global ZIP_NAME which is based on version_info.json
+    zip_name = ZIP_NAME
     zip_path = os.path.join(project_root, zip_name)
     
     # Check if dist exists

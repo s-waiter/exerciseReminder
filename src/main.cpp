@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     // 它们都继承自 QObject，以便与 QML 进行交互。
     
     TimerEngine timerEngine; // 计时器逻辑核心
-    TrayIcon trayIcon;       // 系统托盘图标控制
+    TrayIcon trayIcon(&timerEngine);       // 系统托盘图标控制
     AppConfig appConfig;     // 配置管理 (读写注册表/配置文件)
     WindowUtils windowUtils; // 窗口工具 (处理置顶等原生 API)
 
@@ -87,20 +87,7 @@ int main(int argc, char *argv[])
     // 4. 连接 C++ 内部信号与槽 (Signals & Slots)
     // ========================================================================
     // 信号与槽是 Qt 的核心机制，用于对象间通信，类似于观察者模式。
-    // 当 timerEngine 发出 timeUpdated 信号时，执行 lambda 表达式更新托盘提示。
-    
-    QObject::connect(&timerEngine, &TimerEngine::timeUpdated, [&](){
-        // 获取剩余秒数
-        int secs = timerEngine.remainingSeconds();
-        // 格式化字符串
-        QString tip = QString("DeskCare: 剩余 %1 分钟").arg(secs / 60);
-        // 更新托盘图标的鼠标悬停提示
-        trayIcon.updateToolTip(tip);
-    });
-
-    // 连接托盘菜单的 "退出" 请求到应用程序的 quit 槽函数。
-    // 当用户点击托盘菜单的退出时，程序终止。
-    QObject::connect(&trayIcon, &TrayIcon::quitRequested, &app, &QApplication::quit);
+    // 托盘图标内部已经处理了 TimerEngine 的信号，这里不再需要手动连接。
 
     // ========================================================================
     // 5. 初始化 QML 引擎 (前端加载)

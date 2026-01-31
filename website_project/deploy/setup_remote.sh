@@ -43,13 +43,32 @@ if [ -f "/tmp/vite.svg" ]; then
     mv /tmp/vite.svg /var/www/deskcare/
 fi
 if [ -d "/tmp/assets" ]; then
-    mv /tmp/assets /var/www/deskcare/
-fi
-if [ -d "/tmp/downloads" ]; then
-    mv /tmp/downloads /var/www/deskcare/
+    # Merge assets
+    cp -r /tmp/assets/* /var/www/deskcare/assets/ 2>/dev/null || true
+    rm -rf /tmp/assets
 fi
 
-# 5. Configure Nginx
+# 5. Handle Updates (Zip & Version.json)
+echo "Setting up Updates directory..."
+mkdir -p /var/www/deskcare/updates
+if [ -f "/tmp/version.json" ]; then
+    mv /tmp/version.json /var/www/deskcare/updates/
+fi
+
+ZIP_FILE=$1
+if [ ! -z "$ZIP_FILE" ] && [ -f "/tmp/$ZIP_FILE" ]; then
+    echo "Deploying update package: $ZIP_FILE"
+    mv "/tmp/$ZIP_FILE" /var/www/deskcare/updates/
+    
+    # Also update the 'latest' download link in downloads folder if needed
+    # But for now, we just keep it in updates
+    
+    # Ensure downloads folder has the latest zip too for the website button
+    mkdir -p /var/www/deskcare/downloads
+    cp "/var/www/deskcare/updates/$ZIP_FILE" /var/www/deskcare/downloads/
+fi
+
+# 6. Configure Nginx
 echo "Configuring Nginx..."
 mv /tmp/exercise_site.conf /etc/nginx/sites-available/deskcare
 ln -sf /etc/nginx/sites-available/deskcare /etc/nginx/sites-enabled/
@@ -58,6 +77,11 @@ rm -f /etc/nginx/sites-enabled/default
 
 # 6. Restart Nginx
 echo "Restarting Nginx..."
+# Fix permissions
+echo "Setting permissions..."
+chown -R www-data:www-data /var/www/deskcare
+chmod -R 755 /var/www/deskcare
+
 nginx -t
 systemctl restart nginx
 
