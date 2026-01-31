@@ -72,6 +72,7 @@ void TrayIcon::createMenu() {
     // Actions
     m_startAction = m_trayMenu->addAction("▶ 开始专注");
     m_pauseAction = m_trayMenu->addAction("⏸ 暂停计时");
+    m_napAction = m_trayMenu->addAction("☾ 午休模式");
     m_skipAction = m_trayMenu->addAction("⏭ 跳过休息");
     m_resetAction = m_trayMenu->addAction("🔄 重置计时");
     
@@ -96,12 +97,24 @@ void TrayIcon::setupConnections() {
     // Timer interactions
     connect(m_startAction, &QAction::triggered, m_timerEngine, &TimerEngine::togglePause);
     connect(m_pauseAction, &QAction::triggered, m_timerEngine, &TimerEngine::stop);
+    
+    // Connect nap action
+    connect(m_napAction, &QAction::triggered, [this]() {
+        if (m_timerEngine->isNapMode()) {
+            m_timerEngine->stopNap();
+        } else {
+            m_timerEngine->startNap();
+        }
+    });
+
     connect(m_skipAction, &QAction::triggered, m_timerEngine, &TimerEngine::startWork);
     connect(m_resetAction, &QAction::triggered, m_timerEngine, &TimerEngine::startWork);
     
     // Update menu state on timer changes
     connect(m_timerEngine, &TimerEngine::statusChanged, this, &TrayIcon::updateMenuState);
     connect(m_timerEngine, &TimerEngine::timeUpdated, this, &TrayIcon::updateMenuState);
+    // Also update on nap mode change
+    connect(m_timerEngine, &TimerEngine::isNapModeChanged, this, &TrayIcon::updateMenuState);
     
     // App actions
     connect(m_quitAction, &QAction::triggered, qApp, &QApplication::quit);
@@ -131,6 +144,13 @@ void TrayIcon::updateMenuState() {
     
     m_startAction->setVisible(isPaused);
     m_pauseAction->setVisible(!isPaused);
+    
+    // Update nap action text
+    if (m_timerEngine->isNapMode()) {
+        m_napAction->setText("☀ 结束午休");
+    } else {
+        m_napAction->setText("☾ 午休模式");
+    }
     
     int secs = m_timerEngine->remainingSeconds();
     QString timeStr = QString("%1:%2")

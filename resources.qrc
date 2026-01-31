@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file>assets/qml/Main.qml</file>
         <file>assets/qml/OverlayWindow.qml</file>
+        <file>assets/qml/NapWindow.qml</file>
         <file>assets/qml/ThemeController.qml</file>
         <file>assets/images/tray_icon.svg</file>
     </qresource>

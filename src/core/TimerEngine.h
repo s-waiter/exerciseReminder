@@ -44,6 +44,9 @@ class TimerEngine : public QObject
     // 用于进度条计算：progress = remainingSeconds / currentSessionTotalTime
     Q_PROPERTY(int currentSessionTotalTime READ currentSessionTotalTime NOTIFY currentSessionTotalTimeChanged)
 
+    // 6. 是否处于午休模式 (新增)
+    Q_PROPERTY(bool isNapMode READ isNapMode NOTIFY isNapModeChanged)
+
 public:
     // 构造函数
     // parent: 父对象指针。Qt 使用对象树机制管理内存。
@@ -56,6 +59,7 @@ public:
     int workDurationMinutes() const;
     QString estimatedFinishTime() const;
     int currentSessionTotalTime() const;
+    bool isNapMode() const;
 
 // ========================================================================
 // Slots (槽函数)
@@ -79,6 +83,12 @@ public slots:
     
     // 切换暂停/继续状态 (供 QML 按钮点击调用)
     Q_INVOKABLE void togglePause();
+
+    // 开启午休模式
+    Q_INVOKABLE void startNap();
+
+    // 结束午休模式
+    Q_INVOKABLE void stopNap();
 
     // ========================================================================
     // 数据统计相关 (新增)
@@ -124,6 +134,9 @@ signals:
     // 休息结束信号，带有时长（秒），用于统计或日志
     void breakFinished(int durationSeconds);
 
+    // 午休模式改变信号
+    void isNapModeChanged();
+
 private slots:
     // 内部槽函数：处理 QTimer 的每秒超时事件
     void onTick();
@@ -140,4 +153,6 @@ private:
     QDateTime m_breakStartTime; // 休息开始时间点 (用于计算休息了多久)
 
     bool m_pausedBySystem = false; // 标记是否因系统锁屏而暂停
+    bool m_isNapMode = false; // 午休模式状态
+    QDateTime m_napStartTime; // 记录午休开始时间 (用于统计午休时长)
 };

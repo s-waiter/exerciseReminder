@@ -38,6 +38,7 @@ private:
 
     QAction *m_startAction;
     QAction *m_pauseAction;
+    QAction *m_napAction; // 午休模式
     QAction *m_skipAction;
     QAction *m_resetAction;
     QAction *m_quitAction;

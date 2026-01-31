@@ -932,6 +932,50 @@ Window {
                     }
                 }
                 
+                // 午休助眠卡片
+                Rectangle {
+                    id: napCard
+                    width: 60
+                    height: 40
+                    color: "#1Affffff"
+                    radius: 10
+                    border.color: napMouseArea.containsMouse ? mainWindow.themeColor : "transparent"
+                    border.width: 1
+                    
+                    scale: napMouseArea.containsMouse ? 1.05 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+
+                    MouseArea {
+                        id: napMouseArea
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: timerEngine.startNap()
+                    }
+                    
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 2
+                        
+                        Text {
+                            text: "☾" // Moon symbol
+                            color: "white"
+                            font.pixelSize: 14 // 保持与其他卡片内元素大小协调
+                            font.bold: true
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            height: 16 // 与 intervalCard 的 text height 16 保持对齐
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        
+                        Text {
+                            text: "午休助眠"
+                            color: "#8899A6"
+                            font.pixelSize: 10
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+                }
+
                 // 开机自启卡片 (极简 Switch 风格)
                 Rectangle {
                     id: autoStartCard
@@ -1454,7 +1498,8 @@ Window {
         delegate: OverlayWindow {
             screen: modelData // 绑定到对应屏幕
             themeData: themeController.currentTheme
-            visible: isReminderActive
+            // 只有当全局提醒激活且不在午休模式时显示
+            visible: isReminderActive && !timerEngine.isNapMode
             
             onReminderFinished: {
                 isReminderActive = false
@@ -1467,12 +1512,24 @@ Window {
             }
         }
     }
-
-
+    
+    // 多屏实例化午休窗口
+    Instantiator {
+        model: Qt.application.screens
+        delegate: NapWindow {
+            screen: modelData // 绑定到对应屏幕
+            // 由 TimerEngine 内部状态控制显示，NapWindow 内部已绑定 visible: timerEngine.isNapMode
+            // 但为了确保每个实例都能正确响应，这里不需要额外绑定 visible，
+            // 因为 NapWindow 内部的 visible: timerEngine.isNapMode 是对单例 TimerEngine 的绑定。
+        }
+    }
 
     Connections {
         target: timerEngine
         function onReminderTriggered() {
+            // 如果正在午休，不打扰
+            if (timerEngine.isNapMode) return;
+            
             themeController.generateRandomTheme()
             isReminderActive = true
         }

@@ -31,6 +31,43 @@ TimerEngine::TimerEngine(QObject *parent)
     startWork(); 
 }
 
+void TimerEngine::startNap() {
+    if (m_isNapMode) return;
+    
+    // 如果正在计时，暂停它
+    if (m_timer->isActive()) {
+        m_timer->stop();
+    }
+    
+    m_isNapMode = true;
+    m_napStartTime = QDateTime::currentDateTime();
+    
+    // 更新状态文本
+    m_status = "午休中";
+    emit statusChanged();
+    emit isNapModeChanged();
+    
+    qDebug() << "Nap started at" << m_napStartTime;
+}
+
+void TimerEngine::stopNap() {
+    if (!m_isNapMode) return;
+    
+    m_isNapMode = false;
+    emit isNapModeChanged();
+    
+    // 计算午休时长（可选：记录统计）
+    qint64 napDuration = m_napStartTime.secsTo(QDateTime::currentDateTime());
+    qDebug() << "Nap finished. Duration:" << napDuration << "s";
+    
+    // 午休结束后，默认开始新的一轮工作
+    startWork(); 
+}
+
+bool TimerEngine::isNapMode() const {
+    return m_isNapMode;
+}
+
 // -------------------------------------------------------------------------
 // Getter 函数实现 (直接返回成员变量)
 // -------------------------------------------------------------------------
