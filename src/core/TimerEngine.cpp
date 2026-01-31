@@ -154,7 +154,7 @@ void TimerEngine::togglePause() {
 void TimerEngine::recordExercise(int durationSeconds) {
     if (durationSeconds <= 0) return;
 
-    QSettings settings("ExerciseReminder", "Stats");
+    QSettings settings("DeskCare", "Stats");
     QDateTime now = QDateTime::currentDateTime();
     QString today = now.toString("yyyy-MM-dd");
     
@@ -183,19 +183,19 @@ void TimerEngine::recordExercise(int durationSeconds) {
 }
 
 int TimerEngine::getTodayExerciseSeconds() {
-    QSettings settings("ExerciseReminder", "Stats");
+    QSettings settings("DeskCare", "Stats");
     QString today = QDate::currentDate().toString("yyyy-MM-dd");
     return settings.value(today, 0).toInt();
 }
 
 QVariantList TimerEngine::getTodaySessions() {
-    QSettings settings("ExerciseReminder", "Stats");
+    QSettings settings("DeskCare", "Stats");
     QString todayKey = "Sessions/" + QDate::currentDate().toString("yyyy-MM-dd");
     return settings.value(todayKey).toList();
 }
 
 QVariantList TimerEngine::getWeeklyExerciseStats() {
-    QSettings settings("ExerciseReminder", "Stats");
+    QSettings settings("DeskCare", "Stats");
     QVariantList list;
     QDate today = QDate::currentDate();
     

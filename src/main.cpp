@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
         // 获取剩余秒数
         int secs = timerEngine.remainingSeconds();
         // 格式化字符串
-        QString tip = QString("久坐提醒: 剩余 %1 分钟").arg(secs / 60);
+        QString tip = QString("DeskCare: 剩余 %1 分钟").arg(secs / 60);
         // 更新托盘图标的鼠标悬停提示
         trayIcon.updateToolTip(tip);
     });

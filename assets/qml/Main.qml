@@ -21,7 +21,7 @@ Window {
     width: isPinned ? 120 : 280
     height: isPinned ? 120 : 420
     visible: true
-    title: "久坐提醒助手"
+    title: "DeskCare"
     color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
     
     // ========================================================================

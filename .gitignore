@@ -39,6 +39,7 @@ object_script.*
 *.out
 *.app
 *.zip
+!website_project/official_site/public/downloads/*.zip
 *.7z
 *.rar
 
@@ -81,3 +82,7 @@ $RECYCLE.BIN/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Node.js
+node_modules/
+

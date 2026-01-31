@@ -44,7 +44,7 @@ private:
     const QString REG_RUN_KEY = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
     
     // 应用程序名称 (作为注册表键名)
-    const QString APP_NAME = "ExerciseReminder";
+    const QString APP_NAME = "DeskCare";
 };
 
 #endif // APPCONFIG_H

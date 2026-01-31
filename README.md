@@ -1,7 +1,7 @@
-# 久坐提醒助手 (Exercise Reminder)
+# DeskCare (久坐提醒助手)
 
 ## 项目简介
-这是一个基于 Qt 5.15 和 C++ 17 开发的久坐提醒工具。程序常驻系统托盘，每隔 45 分钟会弹出全屏窗口提醒用户休息运动。
+这是一个基于 Qt 5.15 和 C++ 17 开发的久坐提醒工具 DeskCare。程序常驻系统托盘，每隔 45 分钟会弹出全屏窗口提醒用户休息运动。
 
 ## 编译指南
 
@@ -13,17 +13,17 @@
 
 #### 方法一：使用 Qt Creator (推荐)
 1.  打开 Qt Creator。
-2.  点击“打开项目”，选择本项目根目录下的 `ExerciseReminder.pro` 文件。
+2.  点击“打开项目”，选择本项目根目录下的 `DeskCare.pro` 文件。
 3.  配置项目构建套件 (Kit)。
 4.  点击左下角的 **构建 (Build)** 按钮（或按 `Ctrl+B`）。
-5.  点击 **运行 (Run)** 按钮（或按 `Ctrl+R`）。
 
 #### 方法二：使用命令行 (qmake)
 1.  打开 Qt 命令行终端 (如 "Qt 5.15.2 (MinGW 8.1.0) 64-bit")。
 2.  进入项目目录：
     ```bash
-    cd c:\Users\admin\Desktop\trae\exerciseReminder
+    cd c:\Users\admin\Desktop\trae\DeskCare
     ```
+    *(注：如果文件夹名未修改，仍为 exerciseReminder)*
 3.  生成 Makefile：
     ```bash
     qmake
@@ -42,4 +42,4 @@
 *   `src/`: C++ 源代码
 *   `assets/qml/`: QML 界面文件
 *   `resources.qrc`: 资源配置文件
-*   `ExerciseReminder.pro`: qmake 项目文件
+*   `DeskCare.pro`: qmake 项目文件

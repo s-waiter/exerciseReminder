@@ -25,11 +25,13 @@ echo [OK] Qt environment configured.
 :: 2. Set Project Paths
 cd /d "%~dp0"
 set "PROJECT_ROOT=%CD%"
+:: NOTE: If you are using a shadow build (default in Qt Creator), update this path to point to your actual build directory.
+:: E.g., ..\build-DeskCare-Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release
 set "BUILD_DIR=%PROJECT_ROOT%\build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release"
-set "EXE_NAME=ExerciseReminder.exe"
+set "EXE_NAME=DeskCare.exe"
 set "DIST_DIR=%PROJECT_ROOT%\dist"
 set "QML_DIR=%PROJECT_ROOT%\assets\qml"
-set "ZIP_NAME=ExerciseReminder_v1.0.zip"
+set "ZIP_NAME=DeskCare_v1.0.zip"
 
 :: 3. Check Release File
 echo [CHECK] Checking for executable...
@@ -66,13 +68,12 @@ del "%DIST_DIR%\*.obj" >nul 2>nul
 del "%DIST_DIR%\*.cpp" >nul 2>nul
 del "%DIST_DIR%\*.h" >nul 2>nul
 
-:: 8. Auto-Zip
-echo [STEP] Compressing to ZIP...
-if exist "%ZIP_NAME%" del "%ZIP_NAME%"
-powershell -Command "Compress-Archive -Path '%DIST_DIR%\*' -DestinationPath '%ZIP_NAME%'"
+:: 8. Auto-Zip & Update Website
+echo [STEP] Compressing and Updating Website Resources...
+"C:\Users\admin\anaconda3\python.exe" package_zip.py
 
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Compression failed.
+    echo [ERROR] Packaging failed.
     pause
     exit /b 1
 )
@@ -84,6 +85,33 @@ echo ==========================================
 echo.
 echo Generated file: %PROJECT_ROOT%\%ZIP_NAME%
 echo.
-echo You can now send this ZIP file to your friends.
+
+:: 10. Auto Deploy Option
+set /p DEPLOY_NOW="Do you want to deploy the new version to the website now? (Y/N): "
+if /i "%DEPLOY_NOW%"=="Y" (
+    echo.
+    echo [DEPLOY] Starting deployment sequence...
+    
+    echo [DEPLOY] Building website (npm run build)...
+    cd /d "%PROJECT_ROOT%\website_project\official_site"
+    call npm run build
+    
+    echo [DEPLOY] Uploading to server...
+    cd /d "%PROJECT_ROOT%\website_project"
+    "C:\Users\admin\anaconda3\python.exe" deploy.py
+    
+    if !ERRORLEVEL! EQU 0 (
+        echo.
+        echo [SUCCESS] Website updated and deployed successfully!
+    ) else (
+        echo.
+        echo [ERROR] Deployment failed.
+    )
+    
+    cd /d "%PROJECT_ROOT%"
+) else (
+    echo You can deploy later by running: python website_project\deploy.py
+)
+
 echo.
 pause
