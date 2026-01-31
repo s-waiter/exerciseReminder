@@ -24,9 +24,7 @@ QString Version::getCurrentVersion()
         "version_info.json",
         QCoreApplication::applicationDirPath() + "/version_info.json",
         "../version_info.json",
-        "../../version_info.json",
-        // Absolute path fallback for this specific dev environment as requested/implied
-        "c:/Users/admin/Desktop/trae/DeskCare/version_info.json"
+        "../../version_info.json"
     };
 
     for (const QString &path : paths) {

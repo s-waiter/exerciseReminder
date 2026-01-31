@@ -8,7 +8,7 @@ import { Download, ShieldAlert, Info } from 'lucide-react';
 import { useVersionInfo } from './hooks/useVersionInfo';
 
 function App() {
-  const { version, downloadUrl } = useVersionInfo();
+  const { version, downloadUrl, loading } = useVersionInfo();
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-teal-500 selection:text-white">
@@ -38,11 +38,18 @@ function App() {
                <div className="border-t border-slate-800 my-5"></div>
                
                {/* Main Download Button */}
-               <a href={downloadUrl} download className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-teal-900/50 group">
-                 <Download size={20} className="group-hover:animate-bounce" />
-                 <span>下载完整版 (.zip)</span>
-                 <span className="bg-teal-700/50 text-xs py-0.5 px-2 rounded ml-1 border border-teal-500/30">{version}</span>
-               </a>
+               {loading ? (
+                  <button disabled className="w-full bg-slate-800 text-slate-500 font-bold py-3.5 px-4 rounded-lg cursor-not-allowed flex items-center justify-center gap-2 border border-slate-700">
+                    <div className="h-5 w-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span>获取最新版本中...</span>
+                  </button>
+               ) : (
+                 <a href={downloadUrl || "#"} download={!!downloadUrl} className={`w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 px-4 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-teal-900/50 group ${!downloadUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
+                   <Download size={20} className="group-hover:animate-bounce" />
+                   <span>下载完整版 (.zip)</span>
+                   {version && <span className="bg-teal-700/50 text-xs py-0.5 px-2 rounded ml-1 border border-teal-500/30">{version}</span>}
+                 </a>
+               )}
                
                <p className="text-xs text-gray-500 mt-4 text-center flex items-center justify-center gap-2">
                  <span>大小: ~30MB</span>

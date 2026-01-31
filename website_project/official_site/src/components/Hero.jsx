@@ -5,7 +5,7 @@ import ParticleBackground from './ParticleBackground';
 import { useVersionInfo } from '../hooks/useVersionInfo';
 
 const Hero = () => {
-  const { version, downloadUrl } = useVersionInfo();
+  const { version, downloadUrl, loading } = useVersionInfo();
 
   return (
     <div id="home" className="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden min-h-[90vh] flex flex-col justify-center">
@@ -19,6 +19,7 @@ const Hero = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+        {version && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -31,6 +32,7 @@ const Hero = () => {
           </span>
           {version} 正式版现已发布
         </motion.div>
+        )}
 
         <motion.h1 
           initial={{ opacity: 0, y: 30 }}
@@ -61,11 +63,18 @@ const Hero = () => {
           transition={{ duration: 0.8, delay: 0.4 }}
           className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
         >
-          <a href={downloadUrl} download className="group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden">
-             <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 ease-out transform translate-x-full translate-y-full bg-gradient-to-br from-teal-400 to-cyan-300 group-hover:mb-32 group-hover:mr-0 group-hover:translate-x-0 group-hover:translate-y-0 opacity-30"></span>
-             <Download className="mr-2 h-5 w-5" />
-             免费下载 Windows 版
-          </a>
+          {loading ? (
+             <button disabled className="group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white/50 bg-teal-900/50 rounded-lg cursor-not-allowed">
+                <div className="mr-2 h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                加载版本信息...
+             </button>
+          ) : (
+            <a href={downloadUrl || "#"} download={!!downloadUrl} className={`group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden ${!downloadUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
+               <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 ease-out transform translate-x-full translate-y-full bg-gradient-to-br from-teal-400 to-cyan-300 group-hover:mb-32 group-hover:mr-0 group-hover:translate-x-0 group-hover:translate-y-0 opacity-30"></span>
+               <Download className="mr-2 h-5 w-5" />
+               免费下载 Windows 版
+            </a>
+          )}
           <a href="#features" className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-slate-300 transition-all duration-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white backdrop-blur-sm">
             探索功能 <ChevronRight className="ml-1 h-5 w-5" />
           </a>

@@ -48,10 +48,12 @@ const Navbar = () => {
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-400 transition-all group-hover:w-full"></span>
             </a>
             
+            {downloadUrl && (
             <a href={downloadUrl} download className="relative inline-flex items-center gap-2 px-5 py-2 rounded-full bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 hover:text-teal-300 text-sm font-medium transition-all border border-teal-500/20 hover:border-teal-500/50 backdrop-blur-sm">
               <Download size={16} />
               <span>下载客户端</span>
             </a>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -72,10 +74,12 @@ const Navbar = () => {
           <a href="#" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">首页</a>
           <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">特性</a>
           <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-slate-300 hover:text-white py-2 block">常见问题</a>
+          {downloadUrl && (
           <a href={downloadUrl} download className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white justify-center">
             <Download size={16} />
             <span>下载客户端</span>
           </a>
+          )}
         </div>
       )}
     </nav>

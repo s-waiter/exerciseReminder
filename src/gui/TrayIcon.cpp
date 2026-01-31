@@ -72,9 +72,12 @@ void TrayIcon::createMenu() {
     // Actions
     m_startAction = m_trayMenu->addAction("▶ 开始专注");
     m_pauseAction = m_trayMenu->addAction("⏸ 暂停计时");
-    m_napAction = m_trayMenu->addAction("☾ 午休模式");
     m_skipAction = m_trayMenu->addAction("⏭ 跳过休息");
     m_resetAction = m_trayMenu->addAction("🔄 重置计时");
+    
+    m_trayMenu->addSeparator();
+
+    m_napAction = m_trayMenu->addAction("☾ 午休模式");
     
     m_trayMenu->addSeparator();
     

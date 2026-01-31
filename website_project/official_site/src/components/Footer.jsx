@@ -11,7 +11,7 @@ const Footer = () => {
           <div className="flex flex-col mb-4 md:mb-0">
              <div className="flex items-center">
                <span className="text-xl font-bold text-gray-200">DeskCare</span>
-               <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-900/30 text-teal-400 text-xs font-mono">{version}</span>
+               {version && <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-900/30 text-teal-400 text-xs font-mono">{version}</span>}
              </div>
              <p className="text-slate-500 text-sm mt-1">
                 为久坐者而生，愿你拥有健康的颈椎与明亮的双眼。

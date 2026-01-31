@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 
 export const useVersionInfo = () => {
-  const [version, setVersion] = useState('v1.0.2'); // Default fallback to match current latest
-  const [downloadUrl, setDownloadUrl] = useState('/downloads/DeskCare_v1.0.2.zip'); // Default fallback
+  const [version, setVersion] = useState(''); // No hardcoded fallback
+  const [downloadUrl, setDownloadUrl] = useState(''); // No hardcoded fallback
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/version.json')
@@ -14,8 +15,9 @@ export const useVersionInfo = () => {
           setDownloadUrl(`/downloads/${filename}`);
         }
       })
-      .catch(err => console.error("Failed to fetch version info:", err));
+      .catch(err => console.error("Failed to fetch version info:", err))
+      .finally(() => setLoading(false));
   }, []);
 
-  return { version, downloadUrl };
+  return { version, downloadUrl, loading };
 };

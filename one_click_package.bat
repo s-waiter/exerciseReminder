@@ -108,6 +108,10 @@ if exist "%DESKCARE_SRC%" (
     exit /b 1
 )
 
+:: Copy Version Info
+echo [COPY] Copying version_info.json...
+copy "version_info.json" "%DIST_DIR%" >nul
+
 set "UPDATER_SRC=src\updater\build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release\Updater.exe"
 if exist "%UPDATER_SRC%" (
     copy "%UPDATER_SRC%" "%DIST_DIR%" >nul
