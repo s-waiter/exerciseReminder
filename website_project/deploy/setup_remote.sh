@@ -25,9 +25,20 @@ else
     echo "GoAccess is already installed."
 fi
 
+# 1.2 Install Chinese Language Support
+if ! locale -a | grep -q "zh_CN.utf8"; then
+    echo "Installing Chinese Language Support..."
+    apt-get install -y language-pack-zh-hans
+    locale-gen zh_CN.UTF-8
+    update-locale LANG=zh_CN.UTF-8
+else
+    echo "Chinese Language Support is already installed."
+fi
+
 # 2. Configure Firewall
 echo "Configuring Firewall..."
 ufw allow 'Nginx Full'
+ufw allow 7890/tcp # GoAccess WebSocket
 
 # 3. Setup Site Directory
 echo "Setting up Site Directory..."
@@ -88,9 +99,14 @@ systemctl restart nginx
 # 7. Generate Initial Analytics Report
 echo "Generating Analytics Report..."
 mkdir -p /var/www/deskcare/stats
+
+# Kill existing goaccess processes
+pkill goaccess || true
+
 # Parse Nginx access log and output to stats/report.html
-# Use --log-format=COMBINED for standard Nginx logs
-goaccess /var/log/nginx/access.log --log-format=COMBINED -o /var/www/deskcare/stats/report.html --real-time-html &
+# Use --daemonize to run in background reliably
+# Use LC_ALL=zh_CN.UTF-8 for Chinese report
+LC_ALL=zh_CN.UTF-8 LANG=zh_CN.UTF-8 goaccess /var/log/nginx/access.log --log-format=COMBINED -o /var/www/deskcare/stats/report.html --real-time-html --daemonize
 
 echo -e "${GREEN}=== Deployment Complete! ===${NC}"
 echo -e "Visit: http://47.101.52.0"
