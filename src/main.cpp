@@ -3,6 +3,9 @@
 #include <QQmlContext>
 #include <QDebug>
 #include <QIcon>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QWindow>
 #include "core/AppConfig.h"
 #include "core/TimerEngine.h"
 #include "core/UpdateManager.h"
@@ -80,6 +83,39 @@ int main(int argc, char *argv[])
     app.setWindowIcon(QIcon(":/assets/logo.png"));
 
     // ========================================================================
+    // 2.5 单实例检查 (Single Instance Check)
+    // ========================================================================
+    // 需求：当用户已经启动了一个实例，再次双击 exe 时，不应启动新实例，而是唤醒已有实例。
+    // 实现：使用 QLocalServer/QLocalSocket (基于命名管道/Unix域套接字) 进行进程间通信。
+    
+    const QString serverName = "TraeAI_DeskCare_SingleInstance_Lock";
+    QLocalSocket socket;
+    socket.connectToServer(serverName);
+    
+    // 尝试连接已存在的服务器
+    if (socket.waitForConnected(500)) {
+        qDebug() << "Another instance is running. Waking it up...";
+        // 发送唤醒消息
+        socket.write("WAKE_UP");
+        socket.waitForBytesWritten(1000);
+        socket.disconnectFromServer();
+        
+        // 退出当前新实例
+        return 0;
+    }
+    
+    // 如果连接失败，说明是第一个实例 (或上一个实例崩溃留下了僵尸文件)
+    // 清理可能存在的残留连接文件 (Windows下通常自动清理，但在Unix下很有必要，这里统一处理以防万一)
+    QLocalServer::removeServer(serverName);
+    
+    // 创建单实例服务器
+    QLocalServer singleInstanceServer;
+    if (!singleInstanceServer.listen(serverName)) {
+        qWarning() << "Failed to listen on single instance server:" << singleInstanceServer.errorString();
+        // 即使监听失败，程序也继续运行，只是失去了防多开功能
+    }
+
+    // ========================================================================
     // 3. 初始化 C++ 核心模块 (后端逻辑)
     // ========================================================================
     // 这里实例化了我们在 C++ 中编写的业务逻辑类。
@@ -139,6 +175,43 @@ int main(int argc, char *argv[])
     
     // 开始加载
     engine.load(url);
+
+    // ========================================================================
+    // 6.5 处理单实例唤醒信号
+    // ========================================================================
+    // 当收到第二个实例的连接请求时，将主窗口置顶显示
+    QObject::connect(&singleInstanceServer, &QLocalServer::newConnection, &app, [&]() {
+        QLocalSocket* clientConnection = singleInstanceServer.nextPendingConnection();
+        if (!clientConnection) return;
+        
+        clientConnection->close();
+        clientConnection->deleteLater();
+        
+        // 获取主窗口并激活
+        if (engine.rootObjects().isEmpty()) return;
+        
+        QObject* rootObject = engine.rootObjects().first();
+        QWindow* window = qobject_cast<QWindow*>(rootObject);
+        
+        if (window) {
+            // 如果窗口是隐藏的（如在托盘），显示它
+            window->setVisible(true);
+            
+            // 恢复正常状态（如果是最小化）
+            if (window->visibility() == QWindow::Minimized) {
+                window->showNormal();
+            }
+            
+            // 尝试将窗口置顶并获取焦点
+            window->raise();
+            window->requestActivate();
+            
+            // 针对 Windows 平台的强力置顶 Hack (防止 requestActivate 被操作系统拦截)
+            // 有时 OS 会阻止后台程序抢占焦点，通过模拟最小化再恢复可以绕过
+            // 但对于无边框窗口，直接 raise + requestActivate 通常足够，
+            // 配合 WindowUtils 的 setTopMost 可以确保效果。
+        }
+    });
 
     // ========================================================================
     // 7. 进入主事件循环
