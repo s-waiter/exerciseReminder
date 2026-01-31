@@ -21,10 +21,17 @@ def update_header_file(version):
     content = f"""#ifndef VERSION_H
 #define VERSION_H
 
+#include <QString>
+
 #define APP_VERSION "{version['major']}.{version['minor']}.{version['patch']}"
 #define APP_VERSION_MAJOR {version['major']}
 #define APP_VERSION_MINOR {version['minor']}
 #define APP_VERSION_PATCH {version['patch']}
+
+class Version {{
+public:
+    static QString getCurrentVersion();
+}};
 
 #endif // VERSION_H
 """

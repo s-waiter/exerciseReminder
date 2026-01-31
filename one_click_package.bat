@@ -48,48 +48,48 @@ if not exist "%QT_BIN_DIR%" (
 )
 set "PATH=%QT_BIN_DIR%;%PATH%"
 
-:: 2. Build Updater
-echo [BUILD] Building Updater...
-cd src\updater
-if exist "Makefile" nmake distclean
-call qmake updater.pro
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] qmake for Updater failed.
-    pause
-    exit /b 1
-)
-call nmake release
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] nmake for Updater failed.
-    pause
-    exit /b 1
-)
-cd ..\..
+:: 2. Build Updater (Skipped as per user request)
+echo [BUILD] Skipping Updater build (using existing binary)...
+:: cd src\updater
+:: if exist "Makefile" nmake distclean
+:: call qmake updater.pro
+:: if %ERRORLEVEL% NEQ 0 (
+::     echo [ERROR] qmake for Updater failed.
+::     pause
+::     exit /b 1
+:: )
+:: call nmake release
+:: if %ERRORLEVEL% NEQ 0 (
+::     echo [ERROR] nmake for Updater failed.
+::     pause
+::     exit /b 1
+:: )
+:: cd ..\..
 
-:: 3. Build DeskCare
-echo [BUILD] Building DeskCare...
-set "BUILD_ROOT=build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release"
-if not exist "%BUILD_ROOT%" mkdir "%BUILD_ROOT%"
-cd "%BUILD_ROOT%"
-
-:: Clean old executable to ensure we're not packaging stale file
-if exist "release\DeskCare.exe" del "release\DeskCare.exe"
-:: Optional: clean makefile to ensure fresh build config
-if exist "Makefile" nmake distclean
-
-call qmake "..\..\DeskCare.pro" -spec win32-msvc
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] qmake for DeskCare failed.
-    pause
-    exit /b 1
-)
-call nmake release
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] nmake for DeskCare failed.
-    pause
-    exit /b 1
-)
-cd ..\..
+:: 3. Build DeskCare (Skipped as per user request)
+echo [BUILD] Skipping DeskCare build (using existing binary)...
+:: set "BUILD_ROOT=build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release"
+:: if not exist "%BUILD_ROOT%" mkdir "%BUILD_ROOT%"
+:: cd "%BUILD_ROOT%"
+:: 
+:: :: Clean old executable to ensure we're not packaging stale file
+:: if exist "release\DeskCare.exe" del "release\DeskCare.exe"
+:: :: Optional: clean makefile to ensure fresh build config
+:: if exist "Makefile" nmake distclean
+:: 
+:: call qmake "..\..\DeskCare.pro" -spec win32-msvc
+:: if %ERRORLEVEL% NEQ 0 (
+::     echo [ERROR] qmake for DeskCare failed.
+::     pause
+::     exit /b 1
+:: )
+:: call nmake release
+:: if %ERRORLEVEL% NEQ 0 (
+::     echo [ERROR] nmake for DeskCare failed.
+::     pause
+::     exit /b 1
+:: )
+:: cd ..\..
 
 :: 4. Prepare Dist
 echo [DIST] Preparing distribution...
@@ -99,18 +99,20 @@ mkdir "%DIST_DIR%"
 
 :: 5. Copy Files
 echo [COPY] Copying executables...
-if exist "%BUILD_ROOT%\release\DeskCare.exe" (
-    copy "%BUILD_ROOT%\release\DeskCare.exe" "%DIST_DIR%" >nul
+set "DESKCARE_SRC=build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release\DeskCare.exe"
+if exist "%DESKCARE_SRC%" (
+    copy "%DESKCARE_SRC%" "%DIST_DIR%" >nul
 ) else (
-    echo [ERROR] DeskCare.exe not found in build output.
+    echo [ERROR] DeskCare.exe not found at %DESKCARE_SRC%
     pause
     exit /b 1
 )
 
-if exist "src\updater\release\Updater.exe" (
-    copy "src\updater\release\Updater.exe" "%DIST_DIR%" >nul
+set "UPDATER_SRC=src\updater\build\Desktop_Qt_5_15_2_MSVC2015_64bit-Release\release\Updater.exe"
+if exist "%UPDATER_SRC%" (
+    copy "%UPDATER_SRC%" "%DIST_DIR%" >nul
 ) else (
-    echo [ERROR] Updater.exe not found in build output.
+    echo [ERROR] Updater.exe not found at %UPDATER_SRC%
     pause
     exit /b 1
 )

@@ -56,21 +56,21 @@ def main():
         print(f"Error creating zip: {e}")
         sys.exit(1)
 
-    # 2. Copy to Website Directory
-    website_downloads_dir = os.path.join(project_root, "website_project", "official_site", "public", "downloads")
+    # 2. Copy to Website Directory (REMOVED to avoid redundant uploads and bandwidth waste)
+    # The deployment script uploads the zip separately to /updates/ and copies it to /downloads/ on the server.
+    # Storing it in public/downloads causes it to be bundled into dist/assets, doubling the upload size.
+    print("Skipping copy to website directory to save bandwidth.")
     
-    try:
-        if not os.path.exists(website_downloads_dir):
-            os.makedirs(website_downloads_dir)
-            print(f"Created directory: {website_downloads_dir}")
-            
-        dest_path = os.path.join(website_downloads_dir, zip_name)
-        shutil.copy2(zip_path, dest_path)
-        print(f"Successfully copied zip to: {dest_path}")
-        
-    except Exception as e:
-        print(f"Error copying to website: {e}")
-        sys.exit(1)
+    # website_downloads_dir = os.path.join(project_root, "website_project", "official_site", "public", "downloads")
+    # try:
+    #     if not os.path.exists(website_downloads_dir):
+    #         os.makedirs(website_downloads_dir)
+    #     dest_path = os.path.join(website_downloads_dir, zip_name)
+    #     shutil.copy2(zip_path, dest_path)
+    #     print(f"Successfully copied zip to: {dest_path}")
+    # except Exception as e:
+    #     print(f"Error copying to website: {e}")
+    #     sys.exit(1)
 
 if __name__ == "__main__":
     main()

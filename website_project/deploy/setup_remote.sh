@@ -42,9 +42,16 @@ ufw allow 7890/tcp # GoAccess WebSocket
 
 # 3. Setup Site Directory
 echo "Setting up Site Directory..."
+# SAFETY CHECK: Ensure we have new files to deploy before wiping
+if [ ! -f "/tmp/index.html" ]; then
+    echo "ERROR: Critical deployment files (index.html) missing in /tmp. Aborting deployment."
+    exit 1
+fi
+
 mkdir -p /var/www/deskcare
 # Clean old files but keep the directory
 rm -rf /var/www/deskcare/*
+
 
 # 4. Move uploaded files
 # Files are expected to be in /tmp/ from scp
@@ -55,15 +62,20 @@ if [ -f "/tmp/vite.svg" ]; then
 fi
 if [ -d "/tmp/assets" ]; then
     # Merge assets
-    cp -r /tmp/assets/* /var/www/deskcare/assets/ 2>/dev/null || true
-    rm -rf /tmp/assets
+    echo "Moving assets folder..."
+    # Ensure destination parent exists (it should)
+    # Move the entire assets folder to /var/www/deskcare/
+    mv /tmp/assets /var/www/deskcare/
 fi
 
 # 5. Handle Updates (Zip & Version.json)
 echo "Setting up Updates directory..."
 mkdir -p /var/www/deskcare/updates
 if [ -f "/tmp/version.json" ]; then
-    mv /tmp/version.json /var/www/deskcare/updates/
+    # Move to updates folder
+    cp /tmp/version.json /var/www/deskcare/updates/
+    # Also move to root for website frontend to fetch
+    mv /tmp/version.json /var/www/deskcare/
 fi
 
 ZIP_FILE=$1

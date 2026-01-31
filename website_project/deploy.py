@@ -49,7 +49,32 @@ def deploy():
         transport.connect(username=USERNAME, password=PASSWORD)
         sftp = paramiko.SFTPClient.from_transport(transport)
 
+        # 0. Generate Version Info & Build Website
+        print("Generating version.json...")
+        version_json_path = generate_version_json()
+        
+        print("Building website...")
+        # Check if npm exists
+        if os.system("npm --version") == 0:
+            website_dir = os.path.join(PROJECT_ROOT, "official_site")
+            print(f"Running npm build in {website_dir}...")
+            # We assume npm install is already done or not needed every time. 
+            # If needed, user can run it manually or we can add it. 
+            # For speed, we just run build.
+            build_cmd = f"cd {website_dir} && npm run build"
+            if os.system(build_cmd) != 0:
+                 print("[ERROR] npm build failed.")
+                 sys.exit(1) # Fail fast to prevent deploying empty/bad site
+        else:
+            print("[WARNING] npm not found. Skipping website build. Old dist might be used.")
+            # If old dist is used, check if it exists
+            if not os.path.exists(os.path.join(PROJECT_ROOT, "official_site", "dist", "index.html")):
+                print("[ERROR] No existing build found and npm not available. Aborting.")
+                sys.exit(1)
+
         # 1. Upload Website Assets
+
+
         print(f"Uploading from {LOCAL_DIST_DIR} to {REMOTE_TEMP_DIR}...")
         for root, dirs, files in os.walk(LOCAL_DIST_DIR):
             for file in files:
