@@ -89,6 +89,30 @@ Window {
     }
     
     // ========================================================================
+    // 状态属性
+    // ========================================================================
+    property bool isChecking: false
+
+    // 监听 UpdateManager 信号，重置检查状态
+    Connections {
+        target: updateManager
+        function onUpdateAvailable(version, changelog, url) { mainWindow.isChecking = false }
+        function onNoUpdateAvailable() { mainWindow.isChecking = false }
+        function onUpdateError(error) { mainWindow.isChecking = false }
+    }
+
+    // 连接 TrayIcon 信号，打开设置弹窗
+    Connections {
+        target: trayIcon
+        function onShowMainWindowRequested() {
+            settingsPopup.open()
+            mainWindow.show()
+            mainWindow.raise()
+            mainWindow.requestActivate()
+        }
+    }
+
+    // ========================================================================
     // 窗口拖拽逻辑
     // ========================================================================
     // 由于去掉了系统标题栏，我们需要自己实现窗口拖拽。
@@ -196,14 +220,32 @@ Window {
             opacity: isPinned ? (windowMouseArea.containsMouse ? 1.0 : 0.0) : 1.0
             Behavior on opacity { NumberAnimation { duration: 200 } }
 
-            Text {
-                text: "久坐提醒助手"
-                color: "#8899A6"
-                font.pixelSize: 12
-                font.letterSpacing: 2
-                font.bold: true
+            Column {
                 anchors.centerIn: parent
+                spacing: 0
                 visible: !mainWindow.isPinned // 迷你模式不显示标题文字
+
+                Text {
+                    text: "DeskCare"
+                    color: "#FFFFFF"
+                    opacity: 0.8 // 稍微提升主标题可见度
+                    font.family: "Segoe UI"
+                    font.pixelSize: 15 // 字号恢复一点
+                    font.bold: true
+                    font.letterSpacing: 1.5 // 增加主标题字间距，拉宽整体
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Text {
+                    text: "久坐提醒助手"
+                    color: "#FFFFFF"
+                    opacity: 0.75 // 提高不透明度，确保清晰可见
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: 10 // 稍微调大字号
+                    font.letterSpacing: 0 // 保持紧凑
+                    font.bold: false 
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
             }
 
             // 按钮容器，用于在不同模式下调整位置
@@ -214,6 +256,25 @@ Window {
                 anchors.topMargin: 10
                 spacing: 5
                 
+                // 设置按钮 (已移除，版本号移至右下角)
+                /*
+                Button {
+                    id: settingsBtn
+                    width: 30
+                    height: 30
+                    visible: !mainWindow.isPinned // 迷你模式下隐藏
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Text {
+                        text: "⚙" // Gear icon
+                        color: "white"
+                        font.pixelSize: 18
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: settingsPopup.open()
+                }
+                */
+
                 // 关闭/隐藏按钮
                 Button {
                     id: closeBtn
@@ -861,92 +922,214 @@ Window {
             Popup {
                 id: settingsPopup
                 anchors.centerIn: parent
-                width: 260
-                height: 230
-                modal: true // 模态对话框，遮挡背景
+                width: 280
+                height: 360
+                modal: true
                 focus: true
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                 
+                // 半透明磨砂背景
                 background: Rectangle {
-                    color: "#243B55"
-                    radius: 15
-                    border.color: "#00d2ff"
-                    border.width: 1
+                    color: "#EE1B2A4E" // 增加透明度
+                    radius: 20         // 更圆润的角
+                    border.width: 0    // 去掉边框
+                    
+                    // 内阴影模拟
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 20
+                        color: "transparent"
+                        border.color: "#33ffffff"
+                        border.width: 1
+                        opacity: 0.5
+                    }
                 }
                 
                 Column {
                     anchors.centerIn: parent
-                    spacing: 20
+                    spacing: 25 // 增加间距
+                    width: parent.width * 0.85
                     
-                    Text {
-                        text: "设置提醒间隔"
-                        color: "white"
-                        font.bold: true
-                        font.pixelSize: 16
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    
-                    Row {
-                        spacing: 15
+                    // --- 标题 ---
+                    Column {
+                        spacing: 4
                         anchors.horizontalCenter: parent.horizontalCenter
                         
-                        // 减号按钮
-                        Button {
-                            width: 40
-                            height: 40
-                            text: "-"
-                            background: Rectangle {
-                                color: parent.down ? "#1Affffff" : "transparent"
-                                radius: 20
-                                border.color: "white"
-                            }
-                            contentItem: Text {
-                                text: parent.text
-                                color: "white"
-                                font.pixelSize: 20
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            onClicked: {
-                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes > 1) {
-                                    timerEngine.workDurationMinutes -= 1
-                                }
-                            }
+                        Text {
+                            text: "DeskCare"
+                            color: "white"
+                            font.bold: true
+                            font.family: "Segoe UI" 
+                            font.pixelSize: 24 
+                            font.letterSpacing: 1.2
+                            anchors.horizontalCenter: parent.horizontalCenter
                         }
                         
                         Text {
-                            property var val: timerEngine.workDurationMinutes
-                            text: (val !== undefined ? val : 45) + " 分钟"
-                            color: "#00d2ff"
-                            font.pixelSize: 20
+                            text: "SETTING"
+                            color: "#66ffffff"
+                            font.pixelSize: 10
+                            font.letterSpacing: 4
                             font.bold: true
-                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+
+                    Rectangle { width: parent.width; height: 1; color: "#22ffffff" }
+                    
+                    // --- 1. 提醒间隔 ---
+                    Column {
+                        spacing: 10
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        
+                        Text {
+                            text: "专注时长"
+                            color: "#8899A6"
+                            font.family: "Microsoft YaHei"
+                            font.pixelSize: 13
+                            anchors.horizontalCenter: parent.horizontalCenter
                         }
                         
-                        Button {
-                            width: 40
-                            height: 40
-                            text: "+"
-                            background: Rectangle {
-                                color: parent.down ? "#1Affffff" : "transparent"
-                                radius: 20
-                                border.color: "white"
-                            }
-                            contentItem: Text {
-                                text: parent.text
-                                color: "white"
-                                font.pixelSize: 20
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            onClicked: {
-                                if(timerEngine.workDurationMinutes !== undefined && timerEngine.workDurationMinutes < 120) {
-                                    timerEngine.workDurationMinutes += 1
+                        Row {
+                            spacing: 20
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            
+                            // 减号按钮
+                            Button {
+                                width: 32; height: 32
+                                text: "-"
+                                background: Rectangle {
+                                    color: parent.down ? "#33ffffff" : "#1Affffff" // 半透明填充
+                                    radius: 16
                                 }
+                                contentItem: Text {
+                                    text: parent.text; color: "white"; font.pixelSize: 20
+                                    font.family: "Arial" // 符号用 Arial 更好看
+                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                    anchors.centerIn: parent
+                                    // 微调垂直位置
+                                    bottomPadding: 2
+                                }
+                                onClicked: if(timerEngine.workDurationMinutes > 1) timerEngine.workDurationMinutes -= 1
+                            }
+                            
+                            Text {
+                                text: (timerEngine.workDurationMinutes || 45) + " min"
+                                color: "#00d2ff"
+                                font.family: "Microsoft YaHei"
+                                font.pixelSize: 18
+                                font.bold: true
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            
+                            // 加号按钮
+                            Button {
+                                width: 32; height: 32
+                                text: "+"
+                                background: Rectangle {
+                                    color: parent.down ? "#33ffffff" : "#1Affffff"
+                                    radius: 16
+                                }
+                                contentItem: Text {
+                                    text: parent.text; color: "white"; font.pixelSize: 20
+                                    font.family: "Arial"
+                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                    anchors.centerIn: parent
+                                    bottomPadding: 2
+                                }
+                                onClicked: if(timerEngine.workDurationMinutes < 120) timerEngine.workDurationMinutes += 1
                             }
                         }
                     }
+
+                    Rectangle { width: parent.width; height: 1; color: "#22ffffff" }
+                    
+                    // --- 2. 版本信息与更新 (已移至主界面右下角) ---
+                    /*
+                    Column {
+                        spacing: 15
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        
+                        Column {
+                            spacing: 5
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            Text {
+                                text: "DeskCare v" + updateManager.currentVersion
+                                color: "white"
+                                font.family: "Microsoft YaHei"
+                                font.pixelSize: 14
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                            Text {
+                                text: "让久坐不再伤害你的健康"
+                                color: "#66788A" // 更柔和的副标题色
+                                font.family: "Microsoft YaHei"
+                                font.pixelSize: 10
+                                anchors.horizontalCenter: parent.horizontalCenter
+                            }
+                        }
+
+                        // --- 3. 检查更新 ---
+                        Button {
+                            text: updateStatusText === "" ? "检查更新" : updateStatusText
+                            enabled: !isChecking
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: 120
+                            height: 32
+                            
+                            background: Rectangle {
+                                color: parent.down ? Qt.darker("#3a7bd5", 1.2) : "#3a7bd5" // 改为深蓝色，与主界面 CyberButton 接近
+                                radius: 16
+                                opacity: parent.enabled ? 1.0 : 0.5
+                                border.width: 1
+                                border.color: "#55ffffff"
+                            }
+                            
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white" // 白色文字更协调
+                                font.family: "Microsoft YaHei"
+                                font.pixelSize: 12
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            onClicked: {
+                                isChecking = true
+                                updateStatusText = "正在检查..."
+                                updateManager.checkForUpdates(false) 
+                            }
+                        }
+                    }
+                    */
                 }
+                
+                /*
+                // State properties for update check
+                property bool isChecking: false
+                property string updateStatusText: ""
+
+                Connections {
+                    target: updateManager
+                    function onUpdateAvailable(version, changelog, url) {
+                        settingsPopup.isChecking = false
+                        settingsPopup.updateStatusText = "发现新版本"
+                    }
+                    function onNoUpdateAvailable() {
+                        settingsPopup.isChecking = false
+                        settingsPopup.updateStatusText = "已是最新版本"
+                    }
+                    function onUpdateError(error) {
+                        settingsPopup.isChecking = false
+                        settingsPopup.updateStatusText = "检查失败"
+                    }
+                }
+                
+                onClosed: {
+                    isChecking = false
+                    updateStatusText = ""
+                }
+                */
             }
 
             // 3. 底部操作按钮
@@ -1006,6 +1189,177 @@ Window {
                 }
             }
         }
+
+        // ========================================================================
+        // 简易版本更新 (右下角)
+        // ========================================================================
+        
+        // Update Logic Connections
+        Connections {
+            target: updateManager
+            function onUpdateAvailable(version, changelog, url) {
+                mainWindow.isChecking = false
+                toast.show("发现新版本 v" + version, "#00ff88") // 绿色
+            }
+            function onNoUpdateAvailable() {
+                mainWindow.isChecking = false
+                toast.show("当前已是最新版本", "#00d2ff") // 蓝色
+            }
+            function onUpdateError(error) {
+                mainWindow.isChecking = false
+                toast.show("检查失败: " + error, "#ff4444") // 红色
+            }
+        }
+
+        // 自定义 Toast 提示组件 (位于右下角版本号上方)
+        Rectangle {
+            id: toast
+            // Width calculation: LeftPadding(12) + Indicator(8) + Spacing(8) + Text + RightPadding(12) = Text + 40
+            width: toastText.implicitWidth + 40 
+            height: 32
+            radius: 16
+            color: "#CC1B2A4E" // 半透明深色背景
+            border.color: "#33ffffff"
+            border.width: 1
+            anchors.bottom: versionContainer.top // 修正锚点：versionRow 已更名为 versionContainer
+            anchors.bottomMargin: 8
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            
+            // 初始状态
+            opacity: 0
+            visible: opacity > 0
+            scale: 0.9
+            
+            property alias message: toastText.text
+            property alias accentColor: statusIndicator.color
+            
+            function show(msg, colorCode) {
+                message = msg
+                accentColor = colorCode || "#00d2ff"
+                showAnim.restart()
+                hideTimer.restart()
+            }
+            
+            // 状态指示点
+            Rectangle {
+                id: statusIndicator
+                width: 8
+                height: 8
+                radius: 4
+                color: "#00d2ff"
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+                id: toastText
+                text: "提示信息"
+                color: "white"
+                font.pixelSize: 12
+                font.family: "Microsoft YaHei"
+                anchors.left: statusIndicator.right
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            
+            // 动画
+            ParallelAnimation {
+                id: showAnim
+                NumberAnimation { target: toast; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutQuad }
+                NumberAnimation { target: toast; property: "scale"; to: 1; duration: 200; easing.type: Easing.OutBack }
+                NumberAnimation { target: toast; property: "anchors.bottomMargin"; from: 0; to: 8; duration: 200; easing.type: Easing.OutQuad }
+            }
+            
+            NumberAnimation {
+                id: hideAnim
+                target: toast
+                property: "opacity"
+                to: 0
+                duration: 300
+                easing.type: Easing.InQuad
+            }
+            
+            Timer {
+                id: hideTimer
+                interval: 3000
+                onTriggered: hideAnim.start()
+            }
+        }
+
+        // 右下角版本号容器
+        Item {
+            id: versionContainer
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 12
+            height: 20
+            width: versionText.implicitWidth + refreshIconContainer.width
+            visible: !isPinned 
+            
+            Text {
+                id: versionText
+                text: "v" + updateManager.currentVersion
+                color: "#8899AA" 
+                font.pixelSize: 10 
+                font.family: "Microsoft YaHei"
+                opacity: 0.8 
+                anchors.right: refreshIconContainer.left
+                anchors.rightMargin: 2 // 极小间距，精确控制
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            
+            // 刷新图标容器
+            Item {
+                id: refreshIconContainer
+                width: 14 // 紧贴字符宽度
+                height: 20
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                // 视觉修正：向下偏移 1px
+                anchors.verticalCenterOffset: 1 
+
+                Text {
+                    id: refreshIcon
+                    text: "↻" 
+                    // 悬浮变色：高亮显示
+                    color: mainWindow.isChecking ? "#00d2ff" : (mouseArea.containsMouse ? "#FFFFFF" : "#8899AA")
+                    font.pixelSize: 13 
+                    font.bold: true
+                    opacity: mainWindow.isChecking ? 1.0 : (mouseArea.containsMouse ? 1.0 : 0.8)
+                    anchors.centerIn: parent
+                    
+                    // 悬浮放大特效
+                    scale: mouseArea.pressed ? 0.9 : (mouseArea.containsMouse ? 1.2 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+                    
+                    // 旋转动画
+                    RotationAnimation on rotation {
+                        from: 0
+                        to: 360
+                        duration: 1000
+                        loops: Animation.Infinite
+                        running: mainWindow.isChecking
+                    }
+                }
+                
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    anchors.margins: -10 // 负边距大幅扩大点击热区
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                         if (!mainWindow.isChecking) {
+                             mainWindow.isChecking = true
+                             toast.show("正在检查更新...", "#8899AA") // 灰色提示
+                             updateManager.checkForUpdates(false)
+                         }
+                    }
+                }
+            }
+        }
     }
 
     // 主题控制器
@@ -1039,7 +1393,7 @@ Window {
     // 连接信号
     Connections {
         target: trayIcon
-        function onShowSettingsRequested() {
+        function onShowMainWindowRequested() {
             mainWindow.visible = true
             mainWindow.raise()
             mainWindow.requestActivate()

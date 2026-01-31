@@ -5,6 +5,7 @@
 #include <QIcon>
 #include "core/AppConfig.h"
 #include "core/TimerEngine.h"
+#include "core/UpdateManager.h"
 #include "gui/TrayIcon.h"
 #include "utils/WindowUtils.h"
 
@@ -79,7 +80,8 @@ int main(int argc, char *argv[])
     // 它们都继承自 QObject，以便与 QML 进行交互。
     
     TimerEngine timerEngine; // 计时器逻辑核心
-    TrayIcon trayIcon(&timerEngine);       // 系统托盘图标控制
+    UpdateManager updateManager; // 更新管理器
+    TrayIcon trayIcon(&timerEngine, &updateManager);       // 系统托盘图标控制
     AppConfig appConfig;     // 配置管理 (读写注册表/配置文件)
     WindowUtils windowUtils; // 窗口工具 (处理置顶等原生 API)
 
@@ -103,6 +105,7 @@ int main(int argc, char *argv[])
     // 这是 Qt Quick 中 C++ (后端) 与 QML (前端) 交互最简单直接的方式。
     
     engine.rootContext()->setContextProperty("timerEngine", &timerEngine);
+    engine.rootContext()->setContextProperty("updateManager", &updateManager);
     engine.rootContext()->setContextProperty("trayIcon", &trayIcon);
     engine.rootContext()->setContextProperty("appConfig", &appConfig);
     engine.rootContext()->setContextProperty("windowUtils", &windowUtils);

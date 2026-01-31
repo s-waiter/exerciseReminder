@@ -75,15 +75,8 @@ Window {
     property var todaySessions: [] // 今日所有会话详情
     property string sessionTimeRange: ""
 
-    // 自动关闭计时器
-    // 当显示反馈结果（如"本次运动完成"）后，3秒后自动关闭窗口
-    Timer {
-        id: closeTimer
-        interval: 3000
-        onTriggered: {
-            overlayWin.reminderFinished()
-        }
-    }
+    // 自动关闭计时器 - 已移除，改由 feedbackLayer 的倒计时动画驱动
+
 
     // ========================================================================
     // 反馈遮罩层 (Feedback Layer)
@@ -94,7 +87,7 @@ Window {
         anchors.fill: parent
         color: "transparent"
         visible: overlayWin.feedbackText !== "" // 只有有反馈文本时才显示
-        z: 999 // 确保最顶层
+        z: 1001 // 确保最顶层 (高于 mouseTracker z:1000)
 
         // 1. 背景模糊与变暗 (沉浸式呼吸 + 视差)
         Rectangle {
@@ -135,8 +128,6 @@ Window {
                 }
             }
         }
-
-        MouseArea { anchors.fill: parent } // 阻止交互，强制观看结算动画
 
         // 2. 庆祝粒子系统 (从底部升起的金色气泡)
         ParticleSystem {
@@ -184,8 +175,9 @@ Window {
                 Scale {
                     origin.x: resultCard.width/2
                     origin.y: resultCard.height/2
-                    xScale: feedbackLayer.visible ? 1.0 : 0.8
-                    yScale: feedbackLayer.visible ? 1.0 : 0.8
+                    // 悬停时放大 (1.05)，增强交互感
+                    xScale: feedbackLayer.visible ? (feedbackMouseArea.containsMouse ? 1.05 : 1.0) : 0.8
+                    yScale: feedbackLayer.visible ? (feedbackMouseArea.containsMouse ? 1.05 : 1.0) : 0.8
                     Behavior on xScale { NumberAnimation { duration: 600; easing.type: Easing.OutBack } }
                     Behavior on yScale { NumberAnimation { duration: 600; easing.type: Easing.OutBack } }
                 }
@@ -210,6 +202,14 @@ Window {
                         GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.05) }
                         GradientStop { position: 0.4; color: "transparent" }
                     }
+                }
+
+                // 鼠标交互区域 (仅限卡片范围)
+                MouseArea { 
+                    id: feedbackMouseArea
+                    anchors.fill: parent 
+                    hoverEnabled: true // 开启悬停检测
+                    preventStealing: true
                 }
             }
             
@@ -558,7 +558,7 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     
                     Text {
-                        text: "正在恢复工作模式..."
+                        text: feedbackMouseArea.containsMouse ? "已暂停 (移开鼠标继续)" : "正在恢复工作模式..."
                         color: "#66ffffff"
                         font.pixelSize: 14
                         anchors.centerIn: parent
@@ -578,8 +578,11 @@ Window {
                             id: closeTimerCountdown
                             property int elapsed: 0
                             NumberAnimation on elapsed {
+                                id: countdownAnim
                                 running: feedbackLayer.visible
+                                paused: feedbackMouseArea.containsMouse // 悬停暂停
                                 from: 0; to: 3000; duration: 3000
+                                onFinished: overlayWin.reminderFinished() // 动画结束触发关闭
                             }
                         }
                     }
@@ -1075,7 +1078,7 @@ Window {
                 overlayWin.sessionTimeRange = startStr + " - " + endStr
                 
                 // 4. 显示反馈并准备关闭
-                closeTimer.restart()
+                // closeTimer.restart() // 已移除，通过 feedbackLayer 可见性自动触发倒计时
             }
         }
         

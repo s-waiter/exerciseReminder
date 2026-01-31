@@ -10,13 +10,13 @@ class TrayIcon : public QObject {
     Q_OBJECT
 
 public:
-    explicit TrayIcon(TimerEngine *timerEngine, QObject *parent = nullptr);
+    explicit TrayIcon(TimerEngine *timerEngine, UpdateManager *updateManager, QObject *parent = nullptr);
     ~TrayIcon();
 
     void showMessage(const QString &title, const QString &message);
 
 signals:
-    void showSettingsRequested();
+    void showMainWindowRequested();
 
 private slots:
     void onActivated(QSystemTrayIcon::ActivationReason reason);
@@ -41,7 +41,6 @@ private:
     QAction *m_skipAction;
     QAction *m_resetAction;
     QAction *m_quitAction;
-    QAction *m_settingsAction;
     QAction *m_checkUpdateAction; // New action
 
     void createMenu();

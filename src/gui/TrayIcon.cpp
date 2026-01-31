@@ -12,10 +12,10 @@
 #include <QFile>
 #include "../core/TimerEngine.h"
 
-TrayIcon::TrayIcon(TimerEngine *timerEngine, QObject *parent) 
+TrayIcon::TrayIcon(TimerEngine *timerEngine, UpdateManager *updateManager, QObject *parent) 
     : QObject(parent), 
       m_timerEngine(timerEngine),
-      m_updateManager(new UpdateManager(this))
+      m_updateManager(updateManager)
 {
     // Initialize system tray
     m_trayIcon = new QSystemTrayIcon(this);
@@ -77,7 +77,6 @@ void TrayIcon::createMenu() {
     
     m_trayMenu->addSeparator();
     
-    m_settingsAction = m_trayMenu->addAction("⚙️ 显示设置");
     m_checkUpdateAction = m_trayMenu->addAction("☁ 检查更新");
 
     m_trayMenu->addSeparator();
@@ -105,18 +104,6 @@ void TrayIcon::setupConnections() {
     connect(m_timerEngine, &TimerEngine::timeUpdated, this, &TrayIcon::updateMenuState);
     
     // App actions
-    connect(m_settingsAction, &QAction::triggered, [this]() {
-        // We need a signal to show settings, or use WindowUtils directly if possible
-        // For now, assume WindowUtils handles it or we emit a signal if needed
-        // Re-using the logic from previous implementation:
-        // emit showSettingsRequested(); 
-        // But wait, the header changed. Let's fix this properly.
-        // Assuming we rely on AppConfig/TimerEngine or direct Window calls.
-        // Actually, let's just emit a signal or call a global handler.
-        // For simplicity in this refactor, I'll rely on onActivated logic.
-        onActivated(QSystemTrayIcon::DoubleClick); 
-    });
-    
     connect(m_quitAction, &QAction::triggered, qApp, &QApplication::quit);
 
     // Update Manager connections
@@ -134,7 +121,7 @@ void TrayIcon::showMessage(const QString &title, const QString &message) {
 
 void TrayIcon::onActivated(QSystemTrayIcon::ActivationReason reason) {
     if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) {
-        emit showSettingsRequested();
+        emit showMainWindowRequested();
     }
 }
 
@@ -158,11 +145,12 @@ void TrayIcon::updateMenuState() {
 // --- Update Logic ---
 
 void TrayIcon::onCheckUpdate() {
-    showMessage("检查更新", "正在连接服务器检查新版本...");
+    // showMessage("检查更新", "正在连接服务器检查新版本...");
     m_updateManager->checkForUpdates(false);
 }
 
 void TrayIcon::onUpdateAvailable(const QString &version, const QString &changelog, const QString &url) {
+    // Only show modal dialog for update available as it requires user action
     QMessageBox msgBox;
     msgBox.setWindowTitle("发现新版本 " + version);
     msgBox.setTextFormat(Qt::MarkdownText);
@@ -173,17 +161,17 @@ void TrayIcon::onUpdateAvailable(const QString &version, const QString &changelo
     msgBox.button(QMessageBox::No)->setText("稍后提醒");
     
     if (msgBox.exec() == QMessageBox::Yes) {
-        showMessage("开始更新", "正在下载更新包，请稍候...");
+        // showMessage("开始更新", "正在下载更新包，请稍候...");
         m_updateManager->startDownload(url);
     }
 }
 
 void TrayIcon::onNoUpdateAvailable() {
-    showMessage("检查更新", "当前已是最新版本。");
+    // showMessage("检查更新", "当前已是最新版本。");
 }
 
 void TrayIcon::onUpdateError(const QString &error) {
-    showMessage("更新错误", error);
+    // showMessage("更新错误", error);
 }
 
 void TrayIcon::onDownloadProgress(qint64 received, qint64 total) {

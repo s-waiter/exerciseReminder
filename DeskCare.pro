@@ -10,7 +10,8 @@ SOURCES += \
     src/gui/TrayIcon.cpp \
     src/core/AppConfig.cpp \
     src/utils/WindowUtils.cpp \
-    src/core/UpdateManager.cpp
+    src/core/UpdateManager.cpp \
+    src/core/Version.cpp
 
 HEADERS += \
     src/core/TimerEngine.h \

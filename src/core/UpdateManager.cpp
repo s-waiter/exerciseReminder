@@ -22,14 +22,27 @@ UpdateManager::UpdateManager(QObject *parent) : QObject(parent), m_networkManage
     m_networkManager->setProxy(QNetworkProxy::NoProxy);
 }
 
+QString UpdateManager::currentVersion() const
+{
+    return Version::getCurrentVersion();
+}
+
 void UpdateManager::checkForUpdates(bool silent)
 {
-    m_silentCheck = silent;
-    
+    qDebug() << "[UpdateManager] checkForUpdates called. Silent:" << silent;
+
+    // Prevent crash: If a request is running, disconnect it before aborting
+    // This ensures onVersionCheckFinished is NOT called, preventing double-deletion
+    // and accessing m_currentReply after it has been set to nullptr.
     if (m_currentReply) {
+        qDebug() << "[UpdateManager] Aborting pending request.";
+        m_currentReply->disconnect(this);
         m_currentReply->abort();
         m_currentReply->deleteLater();
+        m_currentReply = nullptr;
     }
+
+    m_silentCheck = silent;
 
     QUrl url(UPDATE_URL);
     QNetworkRequest request(url);
@@ -42,98 +55,121 @@ void UpdateManager::checkForUpdates(bool silent)
 
 void UpdateManager::onVersionCheckFinished()
 {
-    if (!m_currentReply) return;
+    if (!m_currentReply) {
+        qDebug() << "[UpdateManager] onVersionCheckFinished called but m_currentReply is null (aborted?)";
+        return;
+    }
     
-    m_currentReply->deleteLater();
+    // Take ownership of the reply to prevent re-entrancy issues or double-deletion
+    // if checkForUpdates is called inside a slot connected to signals emitted here.
+    QNetworkReply *reply = m_currentReply;
+    m_currentReply = nullptr;
+    reply->deleteLater();
     
-    if (m_currentReply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError) {
+        qDebug() << "[UpdateManager] Network error:" << reply->errorString();
         if (!m_silentCheck) {
-            emit updateError("网络请求失败: " + m_currentReply->errorString());
+            emit updateError("检查更新失败: " + reply->errorString());
         }
-        m_currentReply = nullptr;
         return;
     }
 
-    QByteArray data = m_currentReply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (doc.isNull() || !doc.isObject()) {
+    QByteArray data = reply->readAll();
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+    
+    if (parseError.error != QJsonParseError::NoError) {
+        qDebug() << "[UpdateManager] JSON parse error:" << parseError.errorString();
         if (!m_silentCheck) {
-            emit updateError("无法解析版本信息");
+            emit updateError("无法解析版本信息: " + parseError.errorString());
         }
-        m_currentReply = nullptr;
         return;
     }
 
     QJsonObject obj = doc.object();
-    QString remoteVersion = obj["latest_version"].toString();
-    QString currentVersion = APP_VERSION;
+    
+    // Debug: Print full JSON response
+    qDebug() << "[UpdateManager] Received JSON:" << doc.toJson(QJsonDocument::Compact);
 
-    if (isNewerVersion(remoteVersion, currentVersion)) {
-        QString changelog = obj["changelog"].toString();
-        QString url = obj["download_url"].toString();
-        emit updateAvailable(remoteVersion, changelog, url);
+    // Support both "version" and "latest_version" fields
+    QString remoteVersion = obj["version"].toString();
+    if (remoteVersion.isEmpty()) {
+        remoteVersion = obj["latest_version"].toString();
+    }
+    
+    QString changelog = obj["changelog"].toString();
+    QString downloadUrl = obj["download_url"].toString();
+    
+    if (remoteVersion.isEmpty()) {
+        qDebug() << "[UpdateManager] Remote version is empty.";
+        if (!m_silentCheck) {
+            emit updateError("版本信息无效");
+        }
+        return;
+    }
+
+    qDebug() << "[UpdateManager] Remote version:" << remoteVersion << "Local:" << Version::getCurrentVersion();
+
+    if (isNewerVersion(remoteVersion, Version::getCurrentVersion())) {
+        emit updateAvailable(remoteVersion, changelog, downloadUrl);
     } else {
         if (!m_silentCheck) {
             emit noUpdateAvailable();
         }
     }
-    
-    m_currentReply = nullptr;
 }
 
 void UpdateManager::startDownload(const QString &url)
 {
-    if (m_currentReply) {
-        m_currentReply->abort();
-        m_currentReply->deleteLater();
-    }
-
-    QUrl qUrl(url);
-    QNetworkRequest request(qUrl);
-    m_currentReply = m_networkManager->get(request);
+    // Simple download logic - in a real app might want a separate DownloadManager or handle redirects
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     
-    connect(m_currentReply, &QNetworkReply::downloadProgress, this, &UpdateManager::downloadProgress);
-    connect(m_currentReply, &QNetworkReply::finished, this, &UpdateManager::onDownloadFinished);
+    QNetworkReply *reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::downloadProgress, this, &UpdateManager::downloadProgress);
+    connect(reply, &QNetworkReply::finished, this, &UpdateManager::onDownloadFinished);
 }
 
 void UpdateManager::onDownloadFinished()
 {
-    if (!m_currentReply) return;
-    m_currentReply->deleteLater();
-
-    if (m_currentReply->error() != QNetworkReply::NoError) {
-        emit updateError("下载失败: " + m_currentReply->errorString());
-        m_currentReply = nullptr;
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply) return;
+    
+    reply->deleteLater();
+    
+    if (reply->error() != QNetworkReply::NoError) {
+        emit updateError("下载失败: " + reply->errorString());
         return;
     }
-
-    // Save to temp
-    QString tempPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    QString filePath = tempPath + "/DeskCare_Update.zip";
     
-    QFile file(filePath);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(m_currentReply->readAll());
-        file.close();
-        emit downloadFinished(filePath);
-    } else {
-        emit updateError("无法写入文件: " + filePath);
+    // Save to temp file
+    QString tempPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/DeskCare_Update.zip";
+    QFile file(tempPath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        emit updateError("无法保存更新文件");
+        return;
     }
     
-    m_currentReply = nullptr;
+    file.write(reply->readAll());
+    file.close();
+    
+    emit downloadFinished(tempPath);
 }
 
 bool UpdateManager::isNewerVersion(const QString &remoteVer, const QString &localVer)
 {
-    QStringList rParts = remoteVer.split(".");
-    QStringList lParts = localVer.split(".");
+    // Simple string comparison for now, assuming format x.y.z
+    // For robust comparison, should split by '.' and compare integers
+    QStringList remoteParts = remoteVer.split('.');
+    QStringList localParts = localVer.split('.');
     
-    for (int i = 0; i < qMax(rParts.size(), lParts.size()); ++i) {
-        int r = (i < rParts.size()) ? rParts[i].toInt() : 0;
-        int l = (i < lParts.size()) ? lParts[i].toInt() : 0;
-        
+    int count = qMin(remoteParts.size(), localParts.size());
+    for (int i = 0; i < count; ++i) {
+        int r = remoteParts[i].toInt();
+        int l = localParts[i].toInt();
         if (r > l) return true;
         if (r < l) return false;
     }
-    return false;
+    
+    return remoteParts.size() > localParts.size();
 }

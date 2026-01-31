@@ -9,9 +9,13 @@
 class UpdateManager : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString currentVersion READ currentVersion CONSTANT)
+
 public:
     explicit UpdateManager(QObject *parent = nullptr);
-    void checkForUpdates(bool silent = true);
+    Q_INVOKABLE void checkForUpdates(bool silent = true);
+    
+    QString currentVersion() const;
 
 signals:
     void updateAvailable(const QString &version, const QString &changelog, const QString &downloadUrl);
