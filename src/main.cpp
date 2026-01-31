@@ -73,6 +73,11 @@ int main(int argc, char *argv[])
     // 但我们的程序需要常驻系统托盘，所以必须禁用此行为。
     app.setQuitOnLastWindowClosed(false);
 
+    // 设置应用程序信息 (用于 QSettings) 和图标
+    app.setOrganizationName("TraeAI");
+    app.setApplicationName("FocusTimer");
+    app.setWindowIcon(QIcon(":/assets/logo.png"));
+
     // ========================================================================
     // 3. 初始化 C++ 核心模块 (后端逻辑)
     // ========================================================================

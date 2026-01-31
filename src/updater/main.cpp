@@ -63,11 +63,10 @@ private slots:
         
         // Use PowerShell to unzip (Reliable & Built-in)
         // Expand-Archive -Path 'zip' -DestinationPath 'dir' -Force
-        QString cmd = QString("powershell -Command \"Expand-Archive -Path '%1' -DestinationPath '%2' -Force\"")
-                          .arg(m_zipPath)
-                          .arg(m_installDir);
+        QString script = QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force")
+                          .arg(m_zipPath, m_installDir);
         
-        int exitCode = QProcess::execute(cmd);
+        int exitCode = QProcess::execute("powershell", QStringList() << "-Command" << script);
         
         if (exitCode != 0) {
             m_statusLabel->setText(QStringLiteral("\u66f4\u65b0\u5931\u8d25\uff1a\u89e3\u538b\u9519\u8bef"));

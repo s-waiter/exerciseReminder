@@ -171,6 +171,7 @@ void TrayIcon::onNoUpdateAvailable() {
 }
 
 void TrayIcon::onUpdateError(const QString &error) {
+    Q_UNUSED(error);
     // showMessage("更新错误", error);
 }
 
