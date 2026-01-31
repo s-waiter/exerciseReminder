@@ -577,7 +577,9 @@ Window {
                             font.pixelSize: 12
                             font.family: "Microsoft YaHei UI"
                             // 在迷你模式下隐藏，避免遮挡和拥挤，保持界面清爽
-                            visible: !isPinned && timerEngine.statusText === "工作中"
+                            // 修改：使用 opacity 代替 visible 控制显示，避免 layout 抖动
+                            visible: !isPinned
+                            opacity: timerEngine.statusText === "工作中" ? 1.0 : 0.0
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                     }
