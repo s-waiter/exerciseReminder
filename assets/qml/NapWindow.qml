@@ -43,9 +43,13 @@ Window {
         id: clockContainer
         width: 300
         height: 150
-        // 初始居中
-        x: (parent.width - width) / 2
-        y: (parent.height - height) / 2
+        
+        // 使用 anchors 确保初始绝对居中
+        anchors.centerIn: parent
+        
+        // 使用 offset 实现防烧屏移动，基准点始终是屏幕中心
+        anchors.horizontalCenterOffset: 0
+        anchors.verticalCenterOffset: 0
         
         // 时钟文本
         Text {
@@ -60,6 +64,7 @@ Window {
         
         // 日期文本
         Text {
+            id: dateText // 添加 id
             anchors.top: timeText.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             color: "white"
@@ -82,10 +87,9 @@ Window {
             // 每5分钟 (300秒) 随机微调位置，防止 OLED 烧屏
             if (now.getSeconds() === 0 && now.getMinutes() % 5 === 0) {
                 // 在屏幕中心区域 +/- 100 像素范围内随机移动
-                var centerX = (napWin.width - clockContainer.width) / 2
-                var centerY = (napWin.height - clockContainer.height) / 2
-                clockContainer.x = centerX + (Math.random() * 200 - 100)
-                clockContainer.y = centerY + (Math.random() * 200 - 100)
+                // 修改：通过操作 offset 来移动，而不是直接修改 x/y
+                clockContainer.anchors.horizontalCenterOffset = Math.random() * 200 - 100
+                clockContainer.anchors.verticalCenterOffset = Math.random() * 200 - 100
             }
         }
     }
