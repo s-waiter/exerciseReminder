@@ -10,6 +10,8 @@
 #include <QTimer>
 #include <QDebug>
 #include <QMessageBox>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <windows.h>
 
 class UpdaterWindow : public QWidget {
@@ -70,6 +72,39 @@ private slots:
             QMessageBox::critical(this, "更新失败", "解压文件失败:\n" + process.readAllStandardError());
             QApplication::quit();
             return;
+        }
+
+        // 2.5 Rename Directory based on version
+        QFile versionFile(m_installDir + "/version_info.json");
+        if (versionFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument doc = QJsonDocument::fromJson(versionFile.readAll());
+            QJsonObject obj = doc.object();
+            int major = obj["major"].toInt();
+            int minor = obj["minor"].toInt();
+            int patch = obj["patch"].toInt();
+            QString versionStr = QString("v%1.%2.%3").arg(major).arg(minor).arg(patch);
+            
+            versionFile.close(); // Close file before renaming directory
+            
+            QDir installDir(m_installDir);
+            QString oldDirName = installDir.dirName();
+            QString newDirName = "DeskCare_" + versionStr;
+            
+            // Only rename if current dir follows naming convention and is different
+            if (oldDirName != newDirName && oldDirName.startsWith("DeskCare_v")) {
+                m_statusLabel->setText("正在更新目录名称...");
+                
+                // Navigate to parent to perform rename
+                if (installDir.cdUp()) {
+                    if (installDir.rename(oldDirName, newDirName)) {
+                        // Update m_installDir to new path
+                        m_installDir = installDir.absoluteFilePath(newDirName);
+                        qDebug() << "Renamed directory to" << m_installDir;
+                    } else {
+                         qDebug() << "Failed to rename directory";
+                    }
+                }
+            }
         }
         
         m_progressBar->setValue(90);
