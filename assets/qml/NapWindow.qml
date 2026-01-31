@@ -110,7 +110,7 @@ Window {
         
         // 提示文字
         Text {
-            text: "长按屏幕 3 秒退出"
+            text: "长按屏幕 2 秒退出"
             color: "#888888"
             font.pixelSize: 14
             anchors.horizontalCenter: parent.horizontalCenter
@@ -121,81 +121,67 @@ Window {
     // 3. 长按退出交互
     // -------------------------------------------------------------------------
     
-    // 进度环 (退出反馈)
-    Rectangle {
-        id: progressRing
-        width: 100
-        height: 100
-        radius: 50
-        color: "transparent"
-        border.color: "white"
-        border.width: 4
-        anchors.centerIn: parent
-        visible: false // 仅在按住时显示
-        opacity: 0.5
-        
-        // 内部填充 (模拟进度)
-        Rectangle {
-            id: progressFill
-            width: 0
-            height: 0
-            radius: width / 2
-            color: "white"
-            anchors.centerIn: parent
-            opacity: 0.3
-        }
-    }
+    // 退出进度 (0.0 - 1.0)
+    property real exitProgress: 0.0
+
+    // 绑定时钟的视觉反馈
+    // 按住时：透明度变高 (变亮)，轻微放大
+    // timeText 原透明度 0.2，目标 1.0
+    // dateText 原透明度 0.15，目标 0.8
+    // clockContainer 原缩放 1.0，目标 1.15
+    Binding { target: timeText; property: "opacity"; value: 0.2 + (napWin.exitProgress * 0.8) }
+    Binding { target: dateText; property: "opacity"; value: 0.15 + (napWin.exitProgress * 0.65) }
+    Binding { target: clockContainer; property: "scale"; value: 1.0 + (napWin.exitProgress * 0.15) }
 
     MouseArea {
         anchors.fill: parent
         hoverEnabled: false
         
-        // 按下时启动计时
+        // 按下时启动充电动画
         onPressed: {
-            progressRing.visible = true
-            exitTimer.start()
-            progressAnim.start()
+            chargeAnim.start()
         }
         
-        // 松开时重置
+        // 松开时回退
         onReleased: {
-            resetExitState()
+            chargeAnim.stop()
+            dischargeAnim.start()
         }
         
-        // 退出重置
+        // 取消时回退
         onCanceled: {
-            resetExitState()
+            chargeAnim.stop()
+            dischargeAnim.start()
         }
     }
     
-    // 动画：长按时填充圆环
-    PropertyAnimation {
-        id: progressAnim
-        target: progressFill
-        properties: "width,height"
-        from: 0
-        to: 92 // 略小于外环
-        duration: 3000 // 3秒
-        easing.type: Easing.Linear
+    // 充电动画：2秒内达到 1.0
+    NumberAnimation {
+        id: chargeAnim
+        target: napWin
+        property: "exitProgress"
+        to: 1.0
+        duration: 2000 // 改为2秒
+        easing.type: Easing.InOutQuad
+        onFinished: {
+            // 动画完成即触发退出
+            timerEngine.stopNap()
+            napWin.exitProgress = 0.0 // 重置
+        }
     }
 
-    // 计时器：3秒后触发退出
-    Timer {
-        id: exitTimer
-        interval: 3000
-        repeat: false
-        onTriggered: {
-            // 调用 C++ 接口退出午休模式
-            timerEngine.stopNap()
-            resetExitState()
-        }
+    // 放电动画：快速回退
+    NumberAnimation {
+        id: dischargeAnim
+        target: napWin
+        property: "exitProgress"
+        to: 0.0
+        duration: 300
+        easing.type: Easing.OutQuad
     }
-    
+
     function resetExitState() {
-        exitTimer.stop()
-        progressAnim.stop()
-        progressRing.visible = false
-        progressFill.width = 0
-        progressFill.height = 0
+        chargeAnim.stop()
+        napWin.exitProgress = 0.0
     }
 }
