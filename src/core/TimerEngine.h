@@ -95,6 +95,10 @@ public slots:
     // 获取过去7天的运动统计数据 (返回 [{date: "MM-dd", day: "Mon", seconds: 120}, ...])
     Q_INVOKABLE QVariantList getWeeklyExerciseStats();
 
+    // 处理系统锁屏/解锁事件
+    // locked: true 表示锁屏，false 表示解锁
+    void handleSystemLock(bool locked);
+
 // ========================================================================
 // Signals (信号)
 // ========================================================================
@@ -134,4 +138,6 @@ private:
     const int m_snoozeDuration = 5 * 60; // 贪睡时长常量 (5分钟)
     QString m_status;     // 当前状态文本
     QDateTime m_breakStartTime; // 休息开始时间点 (用于计算休息了多久)
+
+    bool m_pausedBySystem = false; // 标记是否因系统锁屏而暂停
 };

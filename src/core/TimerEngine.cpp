@@ -220,6 +220,27 @@ QVariantList TimerEngine::getWeeklyExerciseStats() {
     return list;
 }
 
+void TimerEngine::handleSystemLock(bool locked) {
+    if (locked) {
+        // 系统锁屏
+        if (m_timer->isActive()) {
+            // 如果当前正在计时，则暂停并标记
+            m_timer->stop();
+            m_pausedBySystem = true;
+            qDebug() << "System locked: Timer paused automatically.";
+            // 这里不改变 m_status，让用户感觉只是时间冻结了
+        }
+    } else {
+        // 系统解锁
+        if (m_pausedBySystem) {
+            // 如果之前是因为锁屏而暂停的，则恢复计时
+            m_timer->start();
+            m_pausedBySystem = false;
+            qDebug() << "System unlocked: Timer resumed automatically.";
+        }
+    }
+}
+
 // 定时器回调函数 (每秒执行一次)
 void TimerEngine::onTick() {
     if (m_remainingSecs > 0) {

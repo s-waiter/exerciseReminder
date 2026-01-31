@@ -91,6 +91,10 @@ int main(int argc, char *argv[])
     // 信号与槽是 Qt 的核心机制，用于对象间通信，类似于观察者模式。
     // 托盘图标内部已经处理了 TimerEngine 的信号，这里不再需要手动连接。
 
+    // 连接系统锁屏信号到计时器引擎
+    QObject::connect(&windowUtils, &WindowUtils::sessionStateChanged, 
+                     &timerEngine, &TimerEngine::handleSystemLock);
+
     // ========================================================================
     // 5. 初始化 QML 引擎 (前端加载)
     // ========================================================================

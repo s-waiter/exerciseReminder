@@ -25,7 +25,7 @@ RESOURCES += resources.qrc
 
 # High DPI support for Windows
 windows:MANIFEST_DEPENDENCIES += "type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
-win32:LIBS += -luser32
+win32:LIBS += -luser32 -lwtsapi32
 
 # Fix for MSVC "C2001: newline in constant" error due to UTF-8 encoding with Chinese comments
 msvc:QMAKE_CXXFLAGS += /utf-8

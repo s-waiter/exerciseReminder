@@ -4,15 +4,93 @@
 // #ifdef Q_OS_WIN 是 Qt 的宏，仅在 Windows 平台编译此段代码
 #ifdef Q_OS_WIN
 #include <windows.h> // 引入 Windows API 头文件
+#include <wtsapi32.h> // 引入 Windows Terminal Services API
 #endif
 
 // ========================================================================
-// 设置窗口置顶 (跨平台实现)
+// SysMsgWindow: 专用消息接收窗口
 // ========================================================================
-// 核心逻辑：
-// 1. 尝试将传入的 QObject 转换为 QWindow 指针。
-// 2. Windows 平台：使用原生 WinAPI SetWindowPos，避免窗口闪烁。
-// 3. 其他平台：使用 Qt 标准 API setFlags。
+class WindowUtils::SysMsgWindow : public QWindow {
+public:
+    explicit SysMsgWindow(WindowUtils *parent) : QWindow(), m_parent(parent) {
+        // 设置窗口标志：无边框、工具窗口（不显示在任务栏）
+        setFlags(Qt::FramelessWindowHint | Qt::Tool);
+        
+        // 创建底层窗口句柄
+        // 必须先 create() 才有 HWND
+        create();
+        
+#ifdef Q_OS_WIN
+        HWND hwnd = (HWND)winId();
+        if (hwnd) {
+            // 注册会话通知
+            if (WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION)) {
+                qDebug() << "SysMsgWindow: Successfully registered for session notifications. HWND:" << hwnd;
+            } else {
+                qDebug() << "SysMsgWindow: Failed to register. Error:" << GetLastError();
+            }
+        }
+#endif
+    }
+
+    ~SysMsgWindow() {
+#ifdef Q_OS_WIN
+        HWND hwnd = (HWND)winId();
+        if (hwnd) {
+            WTSUnRegisterSessionNotification(hwnd);
+        }
+#endif
+    }
+
+protected:
+    // 重写 nativeEvent 处理原生消息
+    bool nativeEvent(const QByteArray &eventType, void *message, long *result) override {
+        Q_UNUSED(eventType);
+        Q_UNUSED(result);
+        
+#ifdef Q_OS_WIN
+        MSG *msg = static_cast<MSG *>(message);
+        if (msg->message == WM_WTSSESSION_CHANGE) {
+            qDebug() << "SysMsgWindow: Received WM_WTSSESSION_CHANGE. wParam:" << msg->wParam;
+            switch (msg->wParam) {
+                case WTS_SESSION_LOCK:
+                    qDebug() << "SysMsgWindow: Session Locked";
+                    emit m_parent->sessionStateChanged(true);
+                    break;
+                case WTS_SESSION_UNLOCK:
+                    qDebug() << "SysMsgWindow: Session Unlocked";
+                    emit m_parent->sessionStateChanged(false);
+                    break;
+                default:
+                    break;
+            }
+        }
+#endif
+        return false;
+    }
+
+private:
+    WindowUtils *m_parent;
+};
+
+// ========================================================================
+// WindowUtils 实现
+// ========================================================================
+
+WindowUtils::WindowUtils(QObject *parent) : QObject(parent), m_sysMsgWindow(nullptr) {
+    // 创建隐藏的消息接收窗口
+    // 注意：必须在 GUI 线程中创建
+    m_sysMsgWindow = new SysMsgWindow(this);
+}
+
+WindowUtils::~WindowUtils() {
+    if (m_sysMsgWindow) {
+        delete m_sysMsgWindow;
+        m_sysMsgWindow = nullptr;
+    }
+}
+
+// 设置窗口置顶 (跨平台实现)
 void WindowUtils::setTopMost(QObject *window, bool top) {
     // 安全检查：防止空指针崩溃
     if (!window) return;
