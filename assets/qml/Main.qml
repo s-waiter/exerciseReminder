@@ -15,6 +15,9 @@ import QtGraphicalEffects 1.15 // 引入图形特效（如圆角裁剪、阴影�
 Window {
     id: mainWindow
     
+    // 启动时静默检查更新
+    Component.onCompleted: updateManager.checkForUpdates(true)
+    
     // 动态调整窗口大小：
     // isPinned (迷你模式): 120x120
     // Normal (正常模式): 280x420 (恢复到用户觉得舒适的尺寸)
@@ -92,13 +95,27 @@ Window {
     // 状态属性
     // ========================================================================
     property bool isChecking: false
-
     // 监听 UpdateManager 信号，重置检查状态
     Connections {
         target: updateManager
-        function onUpdateAvailable(version, changelog, url) { mainWindow.isChecking = false }
-        function onNoUpdateAvailable() { mainWindow.isChecking = false }
-        function onUpdateError(error) { mainWindow.isChecking = false }
+        function onUpdateAvailable(version, changelog, url) { 
+            if (mainWindow.isChecking) {
+                updateDialog.open()
+            }
+            mainWindow.isChecking = false 
+        }
+        function onNoUpdateAvailable() { 
+            if (mainWindow.isChecking) {
+                toast.show("当前已是最新版本", "#00FF7F")
+            }
+            mainWindow.isChecking = false 
+        }
+        function onUpdateError(msg) { 
+            if (mainWindow.isChecking) {
+                toast.show(msg, "#FF4444")
+            }
+            mainWindow.isChecking = false 
+        }
     }
 
     // 连接 TrayIcon 信号
@@ -828,7 +845,7 @@ Window {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
-                        onClicked: toast.show("请使用鼠标滚轮修改间隔时间")
+                        onClicked: hintAnim.restart()
                         // 支持鼠标滚轮直接调节时长
                         onWheel: {
                             var delta = wheel.angleDelta.y > 0 ? 1 : -1
@@ -836,6 +853,57 @@ Window {
                             if (newVal >= 1 && newVal <= 120) {
                                 timerEngine.workDurationMinutes = newVal
                             }
+                        }
+                    }
+
+                    // 专用提示气泡
+                    Rectangle {
+                        id: wheelHint
+                        // Width calculation: LeftPadding(12) + Indicator(8) + Spacing(8) + Text + RightPadding(12) = Text + 40
+                        width: hintText.implicitWidth + 40 
+                        height: 32
+                        radius: 16
+                        color: "#CC1B2A4E" // 半透明深色背景
+                        border.color: "#33ffffff"
+                        border.width: 1
+                        anchors.top: parent.bottom
+                        anchors.topMargin: 8
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: opacity > 0
+                        opacity: 0
+                        z: 100 // 确保显示在最上层
+
+                        // 状态指示点
+                        Rectangle {
+                            id: hintIndicator
+                            width: 8
+                            height: 8
+                            radius: 4
+                            color: "#00d2ff"
+                            anchors.left: parent.left
+                            anchors.leftMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            id: hintText
+                            text: "使用鼠标滚轮修改"
+                            color: "white"
+                            font.pixelSize: 12
+                            font.family: "Microsoft YaHei"
+                            anchors.left: hintIndicator.right
+                            anchors.leftMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        SequentialAnimation {
+                            id: hintAnim
+                            ParallelAnimation {
+                                NumberAnimation { target: wheelHint; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: wheelHint; property: "scale"; from: 0.9; to: 1; duration: 200; easing.type: Easing.OutBack }
+                            }
+                            PauseAnimation { duration: 2000 }
+                            NumberAnimation { target: wheelHint; property: "opacity"; to: 0; duration: 300; easing.type: Easing.InQuad }
                         }
                     }
 
@@ -850,13 +918,15 @@ Window {
                             font.bold: true
                             font.pixelSize: 12
                             font.family: "Segoe UI"
+                            height: 16 // 固定高度以对齐右侧开关
+                            verticalAlignment: Text.AlignVCenter
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                         
                         Text { 
                             text: "间隔时长"
                             color: "#8899A6"
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                     }
@@ -886,13 +956,13 @@ Window {
                     
                     Column {
                         anchors.centerIn: parent
-                        spacing: 5
+                        spacing: 2 // 统一间距为 2
                         
                         // 自定义简约 Switch 控件
                         Rectangle {
-                            width: 36
-                            height: 20
-                            radius: 10
+                            width: 30 // 缩小宽度
+                            height: 16 // 缩小高度至 16px 以匹配左侧文字
+                            radius: 8
                             color: appConfig.autoStart ? mainWindow.themeColor : "#33ffffff"
                             anchors.horizontalCenter: parent.horizontalCenter
                             
@@ -900,9 +970,9 @@ Window {
                             
                             // 滑块
                             Rectangle {
-                                width: 16
-                                height: 16
-                                radius: 8
+                                width: 12 // 缩小滑块
+                                height: 12
+                                radius: 6
                                 color: "white"
                                 anchors.verticalCenter: parent.verticalCenter
                                 // 根据开关状态计算 x 坐标
@@ -990,7 +1060,8 @@ Window {
             target: updateManager
             function onUpdateAvailable(version, changelog, url) {
                 mainWindow.isChecking = false
-                toast.show("发现新版本 v" + version, "#00ff88") // 绿色
+                // 静默模式：不弹窗，只让图标闪烁 (通过 hasUpdate 属性自动处理)
+                // toast.show("发现新版本 v" + version, "#00ff88") 
             }
             function onNoUpdateAvailable() {
                 mainWindow.isChecking = false
@@ -1013,7 +1084,7 @@ Window {
             border.color: "#33ffffff"
             border.width: 1
             anchors.bottom: versionContainer.top // 修正锚点：versionRow 已更名为 versionContainer
-            anchors.bottomMargin: 8
+            anchors.bottomMargin: 4 // 缩短间距，使其紧挨着图标
             anchors.right: parent.right
             anchors.rightMargin: 12
             
@@ -1060,7 +1131,7 @@ Window {
                 id: showAnim
                 NumberAnimation { target: toast; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutQuad }
                 NumberAnimation { target: toast; property: "scale"; to: 1; duration: 200; easing.type: Easing.OutBack }
-                NumberAnimation { target: toast; property: "anchors.bottomMargin"; from: 0; to: 8; duration: 200; easing.type: Easing.OutQuad }
+                NumberAnimation { target: toast; property: "anchors.bottomMargin"; from: 0; to: 4; duration: 200; easing.type: Easing.OutQuad }
             }
             
             NumberAnimation {
@@ -1114,17 +1185,34 @@ Window {
                 Text {
                     id: refreshIcon
                     text: "↻" 
-                    // 悬浮变色：高亮显示
-                    color: mainWindow.isChecking ? "#00d2ff" : (mouseArea.containsMouse ? "#FFFFFF" : "#8899AA")
+                    // 优先级: 检查中 > 有更新 > 悬浮 > 默认
+                    color: mainWindow.isChecking ? "#00d2ff" : 
+                           (updateManager.hasUpdate ? "#00d2ff" :  // 有更新也用蓝色，仅靠呼吸区分
+                           (mouseArea.containsMouse ? "#FFFFFF" : "#8899AA"))
+                    
                     font.pixelSize: 13 
                     font.bold: true
-                    opacity: mainWindow.isChecking ? 1.0 : (mouseArea.containsMouse ? 1.0 : 0.8)
+                    
+                    // 透明度呼吸特效
+                    opacity: mainWindow.isChecking ? 1.0 : 
+                             (updateManager.hasUpdate ? updateBreathingOpacity : 
+                             (mouseArea.containsMouse ? 1.0 : 0.8))
+
                     anchors.centerIn: parent
                     
                     // 悬浮放大特效
                     scale: mouseArea.pressed ? 0.9 : (mouseArea.containsMouse ? 1.2 : 1.0)
                     Behavior on scale { NumberAnimation { duration: 100 } }
                     
+                    // 呼吸动画属性
+                    property real updateBreathingOpacity: 1.0
+                    SequentialAnimation on updateBreathingOpacity {
+                        running: updateManager.hasUpdate && !mainWindow.isChecking
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.5; duration: 1200; easing.type: Easing.InOutQuad } // 降低透明度下限增强呼吸感
+                        NumberAnimation { to: 1.0; duration: 1200; easing.type: Easing.InOutQuad }
+                    }
+
                     // 旋转动画
                     RotationAnimation on rotation {
                         from: 0
@@ -1142,11 +1230,210 @@ Window {
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
                     onClicked: {
+                         if (updateManager.hasUpdate) {
+                             updateDialog.open()
+                             return
+                         }
+
                          if (!mainWindow.isChecking) {
                              mainWindow.isChecking = true
                              toast.show("正在检查更新...", "#8899AA") // 灰色提示
                              updateManager.checkForUpdates(false)
                          }
+                    }
+                }
+            }
+        }
+
+        // Update Dialog Overlay
+        // ========================================================================
+        Rectangle {
+            id: updateDialog
+            visible: false
+            anchors.centerIn: parent
+            width: 200 // 更小巧的宽度
+            height: 140 // 更紧凑的高度
+            radius: 16 // 更柔和的圆角
+            color: "#F01B2A4E" // 增加不透明度，提升质感
+            border.color: dialogMouseArea.containsMouse ? 
+                          Qt.lighter(mainWindow.themeColor, 1.3) : 
+                          Qt.rgba(mainWindow.themeColor.r, mainWindow.themeColor.g, mainWindow.themeColor.b, 0.3)
+            border.width: 1
+            
+            // 悬浮放大特效
+            scale: dialogMouseArea.containsMouse ? 1.05 : 1.0
+            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
+            Behavior on border.color { ColorAnimation { duration: 200 } }
+
+            // 玻璃拟态光效 (顶部高光)
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Qt.rgba(1, 1, 1, 0.2)
+                anchors.top: parent.top
+                anchors.topMargin: 1
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // 属性：下载状态
+            property bool isDownloading: false
+            
+            function open() {
+                visible = true
+                isDownloading = false
+                updateManager.resetStatus()
+            }
+            
+            function close() {
+                visible = false
+            }
+
+            // 阻止鼠标点击穿透 + 悬浮检测
+            MouseArea {
+                id: dialogMouseArea
+                anchors.fill: parent
+                hoverEnabled: true 
+                onClicked: {} // 拦截点击
+            }
+
+            // 内容布局
+            Column {
+                anchors.centerIn: parent
+                width: parent.width - 30
+                spacing: 8
+
+                // 标题与版本号组合
+                Item {
+                    width: parent.width
+                    height: 30
+                    visible: !updateDialog.isDownloading
+                    
+                    Text {
+                        text: "发现新版本"
+                        color: "#8899AA"
+                        font.pixelSize: 10
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                    }
+                    
+                    Text {
+                        text: "v" + updateManager.remoteVersion
+                        color: mainWindow.themeColor
+                        font.pixelSize: 18 // 放大版本号作为视觉重心
+                        font.bold: true
+                        font.family: "Segoe UI"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                    }
+                }
+                
+                // 状态/进度区域
+                Item {
+                    width: parent.width
+                    height: 40
+                    
+                    // 1. 简短询问 (非下载状态)
+                    Text {
+                        visible: !updateDialog.isDownloading
+                        text: "立即更新体验新功能?"
+                        color: "#DDDDDD"
+                        font.pixelSize: 11
+                        anchors.centerIn: parent
+                        opacity: 0.8
+                    }
+                    
+                    // 2. 进度条 (下载时显示)
+                    Rectangle {
+                        id: progressBar
+                        visible: updateDialog.isDownloading
+                        width: parent.width
+                        height: 4
+                        radius: 2
+                        color: "#33000000"
+                        anchors.centerIn: parent
+                        
+                        Rectangle {
+                            height: parent.height
+                            width: parent.width * updateManager.downloadProgress
+                            color: mainWindow.themeColor
+                            radius: 2
+                        }
+                    }
+                    
+                    // 3. 下载状态文本
+                    Text {
+                        visible: updateDialog.isDownloading
+                        text: updateManager.updateStatus
+                        color: "#AAAAAA"
+                        font.pixelSize: 9
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.top: progressBar.bottom
+                        anchors.topMargin: 5
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                }
+
+                // 按钮组
+                Row {
+                    spacing: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: !updateDialog.isDownloading
+
+                    // 暂不按钮 (纯文字，极简)
+                    Rectangle {
+                        width: 70
+                        height: 28
+                        color: "transparent"
+                        radius: 14
+                        
+                        Text {
+                            text: "稍后"
+                            color: hoverHandler1.hovered ? "#FFFFFF" : "#8899AA"
+                            anchors.centerIn: parent
+                            font.pixelSize: 11
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        
+                        HoverHandler { id: hoverHandler1 }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: updateDialog.close()
+                        }
+                    }
+
+                    // 立即更新按钮 (高亮胶囊)
+                    Rectangle {
+                        width: 80
+                        height: 28
+                        color: mainWindow.themeColor
+                        radius: 14
+                        // 简单的光泽感
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.lighter(mainWindow.themeColor, 1.2) }
+                            GradientStop { position: 1.0; color: mainWindow.themeColor }
+                        }
+                        
+                        Text {
+                            text: "更新"
+                            // 优化对比度：使用深色文字 (#0B1015) 搭配高亮背景
+                            color: "#0B1015" 
+                            anchors.centerIn: parent
+                            font.bold: true
+                            font.pixelSize: 11
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                updateDialog.isDownloading = true
+                                updateManager.startDownload("")
+                            }
+                        }
                     }
                 }
             }

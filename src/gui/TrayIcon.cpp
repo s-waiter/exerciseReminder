@@ -108,11 +108,11 @@ void TrayIcon::setupConnections() {
 
     // Update Manager connections
     connect(m_checkUpdateAction, &QAction::triggered, this, &TrayIcon::onCheckUpdate);
-    connect(m_updateManager, &UpdateManager::updateAvailable, this, &TrayIcon::onUpdateAvailable);
-    connect(m_updateManager, &UpdateManager::noUpdateAvailable, this, &TrayIcon::onNoUpdateAvailable);
-    connect(m_updateManager, &UpdateManager::updateError, this, &TrayIcon::onUpdateError);
-    connect(m_updateManager, &UpdateManager::downloadProgress, this, &TrayIcon::onDownloadProgress);
-    connect(m_updateManager, &UpdateManager::downloadFinished, this, &TrayIcon::onDownloadFinished);
+    // connect(m_updateManager, &UpdateManager::updateAvailable, this, &TrayIcon::onUpdateAvailable);
+    // connect(m_updateManager, &UpdateManager::noUpdateAvailable, this, &TrayIcon::onNoUpdateAvailable);
+    // connect(m_updateManager, &UpdateManager::updateError, this, &TrayIcon::onUpdateError);
+    // connect(m_updateManager, &UpdateManager::downloadProgressSignal, this, &TrayIcon::onDownloadProgress);
+    // connect(m_updateManager, &UpdateManager::downloadFinished, this, &TrayIcon::onDownloadFinished);
 }
 
 void TrayIcon::showMessage(const QString &title, const QString &message) {

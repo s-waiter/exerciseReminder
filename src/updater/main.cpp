@@ -1,7 +1,4 @@
 #include <QApplication>
-#if defined(_MSC_VER) && (_MSC_VER >= 1600)
-# pragma execution_character_set("utf-8")
-#endif
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -18,115 +15,102 @@
 class UpdaterWindow : public QWidget {
     Q_OBJECT
 public:
-    UpdaterWindow(QString zipPath, QString installDir, QString exeName) 
-        : m_zipPath(zipPath), m_installDir(installDir), m_exeName(exeName) {
-        
-        setWindowTitle("DeskCare Updater");
+    UpdaterWindow(const QString &zipPath, const QString &installDir, const QString &appName) 
+        : m_zipPath(zipPath), m_installDir(installDir), m_appName(appName) 
+    {
+        setWindowTitle("DeskCare 正在更新");
         setFixedSize(400, 150);
-        setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-        setStyleSheet("background-color: #2d2d2d; color: white; border: 1px solid #444; border-radius: 8px;");
-
-        QVBoxLayout *layout = new QVBoxLayout(this);
+        setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
         
-        QLabel *title = new QLabel(QStringLiteral("\u6b63\u5728\u66f4\u65b0 DeskCare..."), this);
-        title->setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px; border: none;");
-        title->setAlignment(Qt::AlignCenter);
-        layout->addWidget(title);
-
-        m_statusLabel = new QLabel(QStringLiteral("\u6b63\u5728\u7b49\u5f85\u4e3b\u7a0b\u5e8f\u9000\u51fa..."), this);
-        m_statusLabel->setStyleSheet("color: #aaa; margin-bottom: 5px; border: none;");
-        m_statusLabel->setAlignment(Qt::AlignCenter);
+        // Setup UI
+        QVBoxLayout *layout = new QVBoxLayout(this);
+        layout->setContentsMargins(20, 20, 20, 20);
+        
+        m_statusLabel = new QLabel("正在准备更新...", this);
+        m_statusLabel->setStyleSheet("font-size: 14px; color: #333;");
         layout->addWidget(m_statusLabel);
-
+        
+        layout->addSpacing(10);
+        
         m_progressBar = new QProgressBar(this);
         m_progressBar->setRange(0, 100);
         m_progressBar->setValue(0);
-        m_progressBar->setStyleSheet(
-            "QProgressBar { border: 1px solid #555; border-radius: 4px; background-color: #222; height: 10px; }"
-            "QProgressBar::chunk { background-color: #3b82f6; border-radius: 4px; }"
-        );
         layout->addWidget(m_progressBar);
-
+        
         // Start update process
         QTimer::singleShot(1000, this, &UpdaterWindow::startUpdate);
     }
 
 private slots:
     void startUpdate() {
-        // 1. Wait for process to exit
-        m_progressBar->setValue(10);
-        QThread::sleep(2); // Give it a bit more time
-
-        // 2. Unzip
-        m_statusLabel->setText(QStringLiteral("\u6b63\u5728\u5b89\u88c5\u66f4\u65b0..."));
+        // 1. Wait for main app to exit
+        m_statusLabel->setText("等待主程序关闭...");
+        QThread::sleep(1);
+        
+        // Kill if still running (simple check)
+        QProcess::execute("taskkill", QStringList() << "/F" << "/IM" << m_appName);
+        
+        m_statusLabel->setText("正在解压文件...");
         m_progressBar->setValue(30);
         
-        // Use PowerShell to unzip (Reliable & Built-in)
-        // Expand-Archive -Path 'zip' -DestinationPath 'dir' -Force
-        QString script = QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force")
-                          .arg(m_zipPath, m_installDir);
+        // 2. Unzip (Use 7z or simple file copy if zip lib not avail? 
+        // For this demo, assuming we just replace the exe if it was a direct file, 
+        // but since it is a zip, we need unzip. 
+        // NOTE: In real prod, use KArchive or calls to 7z.exe/powershell)
         
-        int exitCode = QProcess::execute("powershell", QStringList() << "-Command" << script);
+        // Using PowerShell to unzip (Native on Windows 10+)
+        QString psCommand = QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force")
+                              .arg(m_zipPath, m_installDir);
+                      
+        QProcess process;
+        process.start("powershell", QStringList() << "-command" << psCommand);
+        process.waitForFinished();
         
-        if (exitCode != 0) {
-            m_statusLabel->setText(QStringLiteral("\u66f4\u65b0\u5931\u8d25\uff1a\u89e3\u538b\u9519\u8bef"));
-            QMessageBox::critical(this, QStringLiteral("\u66f4\u65b0\u5931\u8d25"), QStringLiteral("\u65e0\u6cd5\u89e3\u538b\u66f4\u65b0\u5305\uff0c\u8bf7\u91cd\u8bd5\u6216\u624b\u52a8\u4e0b\u8f7d\u3002"));
+        if (process.exitCode() != 0) {
+            QMessageBox::critical(this, "更新失败", "解压文件失败:\n" + process.readAllStandardError());
             QApplication::quit();
             return;
         }
-
-        // Clean up zip file
-        QFile::remove(m_zipPath);
-
-        m_progressBar->setValue(90);
-        m_statusLabel->setText(QStringLiteral("\u66f4\u65b0\u5b8c\u6210\uff0c\u6b63\u5728\u91cd\u542f..."));
-
-        // 3. Restart
-        QThread::sleep(1);
-        QString exePath = m_installDir + "/" + m_exeName;
         
-        // Use QProcess::startDetached to run without parent
-        if (QProcess::startDetached(exePath, QStringList())) {
-            m_progressBar->setValue(100);
-            QTimer::singleShot(500, qApp, &QCoreApplication::quit);
-        } else {
-            m_statusLabel->setText(QStringLiteral("\u65e0\u6cd5\u542f\u52a8\u7a0b\u5e8f"));
-            QMessageBox::critical(this, QStringLiteral("\u9519\u8bef"), QStringLiteral("\u65e0\u6cd5\u542f\u52a8\u7a0b\u5e8f: ") + exePath);
-            QApplication::quit();
-        }
+        m_progressBar->setValue(90);
+        m_statusLabel->setText("更新完成，正在重启...");
+        
+        // 3. Restart App
+        QString appPath = m_installDir + "/" + m_appName;
+        QProcess::startDetached(appPath, QStringList());
+        
+        m_progressBar->setValue(100);
+        QTimer::singleShot(1000, qApp, &QApplication::quit);
     }
 
 private:
     QString m_zipPath;
     QString m_installDir;
-    QString m_exeName;
+    QString m_appName;
     QLabel *m_statusLabel;
     QProgressBar *m_progressBar;
 };
 
 #include "main.moc"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     QApplication a(argc, argv);
-
-    // Args: updater.exe <zip_path> <install_dir> <exe_name>
-    if (argc < 4) {
-        // Test mode or error
-        // QMessageBox::information(nullptr, "Updater", "Usage: Updater.exe <zip_path> <install_dir> <exe_name>");
+    
+    // Args: Updater.exe <zip_path> <install_dir> <app_name>
+    QStringList args = a.arguments();
+    if (args.count() < 4) {
+        // Debug mode or error
+        // QMessageBox::information(nullptr, "Updater", "Usage: Updater.exe <zip> <dir> <app>");
         // return 0;
-        
-        // For dev testing
-        // UpdaterWindow w("C:/temp/update.zip", "C:/App", "DeskCare.exe");
-        // w.show();
-        return 0;
     }
-
-    QString zipPath = QString::fromLocal8Bit(argv[1]);
-    QString installDir = QString::fromLocal8Bit(argv[2]);
-    QString exeName = QString::fromLocal8Bit(argv[3]);
-
-    UpdaterWindow w(zipPath, installDir, exeName);
+    
+    QString zipPath = args.value(1);
+    QString installDir = args.value(2);
+    QString appName = args.value(3);
+    
+    UpdaterWindow w(zipPath, installDir, appName);
     w.show();
-
+    
     return a.exec();
 }

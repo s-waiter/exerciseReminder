@@ -16,7 +16,11 @@ const QString UPDATE_URL = "http://47.101.52.0/updates/version.json";
 
 #include <QNetworkProxy>
 
-UpdateManager::UpdateManager(QObject *parent) : QObject(parent), m_networkManager(new QNetworkAccessManager(this)), m_currentReply(nullptr)
+UpdateManager::UpdateManager(QObject *parent) : QObject(parent), 
+    m_networkManager(new QNetworkAccessManager(this)), 
+    m_currentReply(nullptr),
+    m_hasUpdate(false),
+    m_downloadProgress(0.0)
 {
     // Disable proxy to speed up connection (avoids Windows auto-detect delay)
     m_networkManager->setProxy(QNetworkProxy::NoProxy);
@@ -111,8 +115,17 @@ void UpdateManager::onVersionCheckFinished()
     qDebug() << "[UpdateManager] Remote version:" << remoteVersion << "Local:" << Version::getCurrentVersion();
 
     if (isNewerVersion(remoteVersion, Version::getCurrentVersion())) {
+        m_hasUpdate = true;
+        m_remoteVersion = remoteVersion;
+        m_changelog = changelog;
+        m_downloadUrl = downloadUrl;
+        
+        emit hasUpdateChanged();
         emit updateAvailable(remoteVersion, changelog, downloadUrl);
     } else {
+        m_hasUpdate = false;
+        emit hasUpdateChanged();
+        
         if (!m_silentCheck) {
             emit noUpdateAvailable();
         }
@@ -121,13 +134,42 @@ void UpdateManager::onVersionCheckFinished()
 
 void UpdateManager::startDownload(const QString &url)
 {
-    // Simple download logic - in a real app might want a separate DownloadManager or handle redirects
-    QNetworkRequest request(url);
+    // Use stored URL if argument is empty
+    QString targetUrl = url;
+    if (targetUrl.isEmpty()) {
+        targetUrl = m_downloadUrl;
+    }
+    
+    if (targetUrl.isEmpty()) {
+        emit updateError("下载地址无效");
+        return;
+    }
+
+    m_updateStatus = "正在连接下载服务器...";
+    emit updateStatusChanged();
+    
+    m_downloadProgress = 0.0;
+    emit downloadProgressChanged();
+
+    // Simple download logic
+    QNetworkRequest request(targetUrl);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     
     QNetworkReply *reply = m_networkManager->get(request);
-    connect(reply, &QNetworkReply::downloadProgress, this, &UpdateManager::downloadProgress);
+    connect(reply, &QNetworkReply::downloadProgress, this, &UpdateManager::onDownloadProgress);
     connect(reply, &QNetworkReply::finished, this, &UpdateManager::onDownloadFinished);
+}
+
+void UpdateManager::onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal)
+{
+    if (bytesTotal > 0) {
+        m_downloadProgress = (double)bytesReceived / (double)bytesTotal;
+        emit downloadProgressChanged();
+        emit downloadProgressSignal(bytesReceived, bytesTotal);
+        
+        m_updateStatus = QString("正在下载更新包 (%1%)...").arg(int(m_downloadProgress * 100));
+        emit updateStatusChanged();
+    }
 }
 
 void UpdateManager::onDownloadFinished()
@@ -138,28 +180,68 @@ void UpdateManager::onDownloadFinished()
     reply->deleteLater();
     
     if (reply->error() != QNetworkReply::NoError) {
-        emit updateError("下载失败: " + reply->errorString());
+        m_updateStatus = "下载失败: " + reply->errorString();
+        emit updateStatusChanged();
+        emit updateError(m_updateStatus);
         return;
     }
     
     // Save to temp file
-    QString tempPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/DeskCare_Update.zip";
-    QFile file(tempPath);
+    m_tempFilePath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/DeskCare_Update.zip";
+    
+    // Delete existing file if present
+    QFile::remove(m_tempFilePath);
+    
+    QFile file(m_tempFilePath);
     if (!file.open(QIODevice::WriteOnly)) {
-        emit updateError("无法保存更新文件");
+        m_updateStatus = "无法保存更新文件";
+        emit updateStatusChanged();
+        emit updateError(m_updateStatus);
         return;
     }
     
     file.write(reply->readAll());
     file.close();
     
-    emit downloadFinished(tempPath);
+    m_updateStatus = "下载完成，正在准备安装...";
+    emit updateStatusChanged();
+    emit downloadFinished(m_tempFilePath);
+    
+    // Auto start install after download? 
+    // Usually better to let UI trigger it or do it here. 
+    // Since the flow is user confirmed -> download -> install, we can proceed.
+    startInstall();
+}
+
+void UpdateManager::startInstall()
+{
+    if (m_tempFilePath.isEmpty() || !QFile::exists(m_tempFilePath)) {
+        emit updateError("更新文件不存在");
+        return;
+    }
+
+    m_updateStatus = "正在启动更新程序...";
+    emit updateStatusChanged();
+
+    QString program = QCoreApplication::applicationDirPath() + "/Updater.exe";
+    QStringList arguments;
+    arguments << m_tempFilePath; // Zip path
+    arguments << QCoreApplication::applicationDirPath(); // Install dir
+    arguments << "DeskCare.exe"; // Exe name (to restart)
+
+    qDebug() << "Starting Updater:" << program << arguments;
+
+    if (!QProcess::startDetached(program, arguments)) {
+        emit updateError("无法启动更新程序");
+        return;
+    }
+
+    QCoreApplication::quit();
 }
 
 bool UpdateManager::isNewerVersion(const QString &remoteVer, const QString &localVer)
 {
     // Simple string comparison for now, assuming format x.y.z
-    // For robust comparison, should split by '.' and compare integers
     QStringList remoteParts = remoteVer.split('.');
     QStringList localParts = localVer.split('.');
     
