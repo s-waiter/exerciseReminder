@@ -173,6 +173,7 @@ Window {
     Connections {
         target: updateManager
         function onUpdateAvailable(version, changelog, url) { 
+            // 只有在手动检查模式下才弹窗，自动检查模式下静默处理（只闪烁图标）
             if (mainWindow.isChecking) {
                 updateDialog.open()
             }
@@ -180,7 +181,7 @@ Window {
         }
         function onNoUpdateAvailable() { 
             if (mainWindow.isChecking) {
-                toast.show("当前已是最新版本", "#00FF7F")
+                toast.show("当前已是最新版本", "#00d2ff") // 使用主题蓝
             }
             mainWindow.isChecking = false 
         }
@@ -1147,23 +1148,8 @@ Window {
         // 简易版本更新 (右下角)
         // ========================================================================
         
-        // Update Logic Connections
-        Connections {
-            target: updateManager
-            function onUpdateAvailable(version, changelog, url) {
-                mainWindow.isChecking = false
-                // 静默模式：不弹窗，只让图标闪烁 (通过 hasUpdate 属性自动处理)
-                // toast.show("发现新版本 v" + version, "#00ff88") 
-            }
-            function onNoUpdateAvailable() {
-                mainWindow.isChecking = false
-                toast.show("当前已是最新版本", "#00d2ff") // 蓝色
-            }
-            function onUpdateError(error) {
-                mainWindow.isChecking = false
-                toast.show("检查失败: " + error, "#ff4444") // 红色
-            }
-        }
+        // Update Logic Connections - 已移除冗余的 Connections，统一由顶层 Connections 处理
+        // ========================================================================
 
         // 自定义 Toast 提示组件 (位于右下角版本号上方)
         Rectangle {
