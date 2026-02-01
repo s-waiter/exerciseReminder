@@ -15,8 +15,38 @@ import QtGraphicalEffects 1.15 // 引入图形特效（如圆角裁剪、阴影�
 Window {
     id: mainWindow
     
+    // 初始化标志，防止启动时的属性变化触发不必要的动画或位移逻辑
+    property bool isInitialized: false
+
     // 启动时静默检查更新
-    Component.onCompleted: updateManager.checkForUpdates(true)
+    Component.onCompleted: {
+        updateManager.checkForUpdates(true)
+        
+        // 检查是否是开机自启
+        if (isAutoStartLaunch) {
+            // 如果是开机自启，则直接进入 Mini 模式 (悬浮球)
+            // 先禁用动画，避免飞入效果
+            animationEnabled = false
+            
+            isPinned = true
+            
+            // 计算屏幕右上角位置
+            // 假设屏幕边距 20px
+            var screenGeometry = Qt.application.screens[0].desktopAvailableGeometry
+            // 悬浮球尺寸 120x120
+            var targetX = screenGeometry.width - 120 - 50 // 右侧留出 50px 边距
+            var targetY = 100 // 顶部留出 100px 边距
+            
+            mainWindow.x = targetX
+            mainWindow.y = targetY
+            
+            // 恢复动画
+            animationEnabled = true
+        }
+        
+        // 标记初始化完成
+        isInitialized = true
+    }
     
     // 动态调整窗口大小：
     // isPinned (迷你模式): 120x120
@@ -40,13 +70,16 @@ Window {
     // ========================================================================
     // 属性动画 (Behavior)
     // ========================================================================
+    // 动画控制开关
+    property bool animationEnabled: true
+    
     // 当 width, height, x, y 发生变化时，不立即突变，而是应用缓动动画。
     // duration: 300ms
     // easing.type: Easing.OutQuint (五次方的缓出曲线，开始快结束慢，手感自然)
-    Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-    Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-    Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-    Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+    Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
+    Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
+    Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
+    Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
 
     // ========================================================================
     // 动态主题色逻辑
@@ -81,6 +114,11 @@ Window {
         //    Mini CircleCenterY = 10 + 100/2 = 60
         //    差值 135 - 60 = 75。
         //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 75。
+        
+        // 注意：如果是程序启动时的初始化阶段 (isInitialized == false)，
+        // 我们不执行这个位移补偿。因为此时我们正在通过代码强制设置窗口的初始位置 (例如右上角)，
+        // 任何额外的位移都会破坏这个定位。
+        if (!isInitialized) return
         
         if (isPinned) {
             mainWindow.x += 80

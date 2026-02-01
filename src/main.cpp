@@ -115,6 +115,15 @@ int main(int argc, char *argv[])
         // 即使监听失败，程序也继续运行，只是失去了防多开功能
     }
 
+    // 3.0 Check command line arguments for auto-start
+    bool isAutoStartLaunch = false;
+    for (int i = 1; i < argc; ++i) {
+        if (QString(argv[i]) == "--autostart") {
+            isAutoStartLaunch = true;
+            break;
+        }
+    }
+    
     // ========================================================================
     // 3. 初始化 C++ 核心模块 (后端逻辑)
     // ========================================================================
@@ -159,6 +168,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("trayIcon", &trayIcon);
     engine.rootContext()->setContextProperty("appConfig", &appConfig);
     engine.rootContext()->setContextProperty("windowUtils", &windowUtils);
+    engine.rootContext()->setContextProperty("isAutoStartLaunch", isAutoStartLaunch);
 
     // 加载主界面 QML 文件
     // qrc:/ 表示从 Qt 资源系统 (Resource System) 中加载，而不是从磁盘路径加载。

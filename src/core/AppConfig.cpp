@@ -10,6 +10,21 @@
 // parent 参数用于 Qt 的对象树内存管理机制。
 AppConfig::AppConfig(QObject *parent) : QObject(parent)
 {
+    // 自动修复逻辑：
+    // 检查注册表中是否已经开启了自启，但缺少 --autostart 参数（旧版本残留）
+    // 如果是，则重新写入带参数的正确值，确保用户升级后能享受到新功能。
+#ifdef Q_OS_WIN
+    if (isAutoStart()) {
+        QSettings settings(REG_RUN_KEY, QSettings::NativeFormat);
+        QString currentValue = settings.value(APP_NAME).toString();
+        
+        // 如果当前值不包含 --autostart，说明是旧版本的设置
+        if (!currentValue.contains("--autostart")) {
+            qDebug() << "Detected legacy auto-start registry key. Updating...";
+            setAutoStart(true); // 重新设置会写入带参数的新值
+        }
+    }
+#endif
 }
 
 // ========================================================================
@@ -52,8 +67,8 @@ void AppConfig::setAutoStart(bool autoStart)
         
         // 写入注册表。
         // 注意：路径如果有空格，必须用双引号括起来，否则 Windows 启动时可能无法正确解析。
-        // 例如： "\"C:\\Program Files\\My App\\app.exe\""
-        settings.setValue(APP_NAME, "\"" + nativePath + "\"");
+        // 添加 --autostart 参数以便区分启动模式
+        settings.setValue(APP_NAME, "\"" + nativePath + "\" --autostart");
     } else {
         // 从注册表中移除该键值，取消自启
         settings.remove(APP_NAME);
