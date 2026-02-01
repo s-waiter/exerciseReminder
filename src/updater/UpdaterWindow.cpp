@@ -147,9 +147,12 @@ void UpdaterWindow::startUpdate() {
         QString nativeSource = QDir::toNativeSeparators(extractPath);
         QString nativeDest = QDir::toNativeSeparators(m_installDir);
         
-        out << "echo [INFO] Copying files from " << nativeSource << " to " << nativeDest << "... >> \"" << logPath << "\"\n";
+        // Define TARGET_DIR variable in batch to track the actual path (pre/post rename)
+        out << "set \"TARGET_DIR=" << nativeDest << "\"\n";
+
+        out << "echo [INFO] Copying files from " << nativeSource << " to %TARGET_DIR%... >> \"" << logPath << "\"\n";
         // xcopy /s /e /y /i
-        out << "xcopy /s /e /y /i \"" << nativeSource << "\" \"" << nativeDest << "\" >> \"" << logPath << "\" 2>&1\n";
+        out << "xcopy /s /e /y /i \"" << nativeSource << "\" \"%TARGET_DIR%\" >> \"" << logPath << "\" 2>&1\n";
         
         out << "if errorlevel 1 (\n";
         out << "    echo [ERROR] XCOPY FAILED! >> \"" << logPath << "\"\n";
@@ -166,6 +169,7 @@ void UpdaterWindow::startUpdate() {
                 QString nativeFinalName = finalDirName;
                 
                 out << "echo [INFO] Renaming directory from " << oldDirName << " to " << finalDirName << "... >> \"" << logPath << "\"\n";
+                // Ensure we are in the parent directory to execute rename
                 out << "cd /d \"" << parentPath << "\"\n";
                 
                 // Safety: if target dir exists (e.g. from failed run), delete it first
@@ -176,14 +180,14 @@ void UpdaterWindow::startUpdate() {
 
                 out << "ren \"" << oldDirName << "\" \"" << finalDirName << "\" >> \"" << logPath << "\" 2>&1\n";
                 
-                // Update nativeDest for launching
-                nativeDest = parentPath + "\\" + finalDirName;
+                // Only update TARGET_DIR if rename succeeded
+                out << "if %ERRORLEVEL%==0 set \"TARGET_DIR=" << parentPath << "\\" << finalDirName << "\"\n";
             }
         }
         
         // Launch App
-        out << "echo [INFO] Starting application at " << nativeDest << "\\" << m_appName << "... >> \"" << logPath << "\"\n";
-        out << "start \"\" \"" << nativeDest << "\\" << m_appName << "\"\n";
+        out << "echo [INFO] Starting application at %TARGET_DIR%\\" << m_appName << "... >> \"" << logPath << "\"\n";
+        out << "start \"\" \"%TARGET_DIR%\\" << m_appName << "\"\n";
         
         // Clean up temp files (self-delete batch file is tricky, let's leave it or delete on next run)
         // out << "del \"%~f0\" & exit\n"; 
@@ -194,8 +198,8 @@ void UpdaterWindow::startUpdate() {
     QThread::msleep(500);
     
     // 5. Execute Batch and Quit
-    // Use cmd /c to run bat
-    QProcess::startDetached("cmd.exe", QStringList() << "/c" << batPath);
+    // Use cmd /c to run bat, set working directory to tempDir to avoid locking the app folder
+    QProcess::startDetached("cmd.exe", QStringList() << "/c" << batPath, tempDir);
     m_isUpdating = false;
     QTimer::singleShot(100, qApp, &QApplication::quit);
 }
