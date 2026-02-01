@@ -97,23 +97,23 @@ Window {
     property bool animationEnabled: true
     
     // 当 width, height, x, y 发生变化时，不立即突变，而是应用缓动动画。
-    // duration: 300ms
+    // duration: 400ms (增加时长以获得更平滑的视觉效果)
     // easing.type: Easing.OutQuint (五次方的缓出曲线，开始快结束慢，手感自然)
     Behavior on width { 
         enabled: animationEnabled
-        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
     }
     Behavior on height { 
         enabled: animationEnabled
-        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
     }
     Behavior on x { 
         enabled: animationEnabled
-        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
     }
     Behavior on y { 
         enabled: animationEnabled
-        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
     }
 
     // ========================================================================
@@ -250,6 +250,7 @@ Window {
                 height: bgContainer.height
                 // 迷你模式下变成圆形 (width/2)，正常模式下是大圆角 (20)
                 radius: isPinned ? width / 2 : 20
+                Behavior on radius { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                 visible: false
             }
         }
@@ -285,12 +286,12 @@ Window {
                 y: isPinned ? (parent.height - height) / 2 : -40
                 
                 // 尺寸平滑过渡
-                Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-                Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+                Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                 
                 // 位置平滑过渡
-                Behavior on x { NumberAnimation { duration: 200 } }
-                Behavior on y { NumberAnimation { duration: 200 } }
+                Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                 
                 // 呼吸动画：透明度在 0.05 到 0.15 之间循环
                 SequentialAnimation on opacity {
@@ -306,6 +307,7 @@ Window {
             id: titleBar
             width: parent.width
             height: isPinned ? 20 : 40
+            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
             anchors.top: parent.top
             z: 10 
             
@@ -477,9 +479,9 @@ Window {
             
             // 关键：尺寸和 Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
             // 这样 WindowY(t) + TopMargin(t) = Constant，从而消除视觉抖动
-            Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
-            Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
-            Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+            Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+            Behavior on anchors.topMargin { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
             
             // 外圈轨道
             Rectangle {
@@ -688,8 +690,8 @@ Window {
                     opacity: active ? 1.0 : 0.0
                     scale: active ? 1.0 : 0.8 // 退出时缩小，营造空间纵深感
                     
-                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+                    Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                    Behavior on scale { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
 
                     Column {
                         anchors.centerIn: parent
@@ -708,7 +710,7 @@ Window {
                             font.weight: Font.Light
                             anchors.horizontalCenter: parent.horizontalCenter
                             
-                            Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
+                            Behavior on font.pixelSize { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                         }
                         
                         Text {
@@ -718,10 +720,15 @@ Window {
                             font.bold: true
                             font.family: "Microsoft YaHei UI"
                             anchors.horizontalCenter: parent.horizontalCenter
-                            opacity: 0.8
-                            visible: !isPinned // 迷你模式下隐藏状态文字，让界面更清爽，只留数字
+                            opacity: isPinned ? 0.0 : 0.8
+                            visible: opacity > 0 // 优化性能，看不见时不渲染
                             
-                            Behavior on font.pixelSize { NumberAnimation { duration: 300 } }
+                            // 高度动画实现平滑布局挤压
+                            height: isPinned ? 0 : implicitHeight
+                            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            
+                            Behavior on font.pixelSize { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                         }
 
                         // 预计结束时间 (ETA) - 正常模式下显示
@@ -730,10 +737,15 @@ Window {
                             color: "#8899A6" // 弱化显示
                             font.pixelSize: 12
                             font.family: "Microsoft YaHei UI"
-                            // 在迷你模式下隐藏，避免遮挡和拥挤，保持界面清爽
-                            // 修改：使用 opacity 代替 visible 控制显示，避免 layout 抖动
-                            visible: !isPinned
-                            opacity: timerEngine.statusText === "工作中" ? 1.0 : 0.0
+                            
+                            // 逻辑：Mini模式隐藏 OR 非工作状态隐藏
+                            opacity: isPinned ? 0.0 : (timerEngine.statusText === "工作中" ? 1.0 : 0.0)
+                            visible: opacity > 0
+                            
+                            height: visible ? implicitHeight : 0
+                            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                     }
