@@ -1577,7 +1577,7 @@ Window {
             Column {
                 anchors.centerIn: parent
                 width: parent.width - 30
-                spacing: 15
+                spacing: 12
                 
                 Text {
                     text: "偏好设置"
@@ -1597,7 +1597,7 @@ Window {
                 // 开机自启开关
                 Item {
                     width: parent.width
-                    height: 30
+                    height: 20
                     
                     Text {
                         text: "开机自启"
@@ -1605,7 +1605,7 @@ Window {
                         font.pixelSize: 12
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -6 // 向上微调 2px 以视觉对齐右侧开关
+                        anchors.verticalCenterOffset: -2 // 向上微调 2px 以视觉对齐右侧开关
                     }
                     
                     Switch {
@@ -1631,6 +1631,136 @@ Window {
                                 color: "white"
                                 anchors.verticalCenter: parent.verticalCenter
                                 Behavior on x { NumberAnimation { duration: 100 } }
+                            }
+                        }
+                    }
+                }
+
+                // 强制运动开关
+                Item {
+                    width: parent.width
+                    height: 20
+                    
+                    Text {
+                        text: "强制运动"
+                        color: "#DDDDDD"
+                        font.pixelSize: 12
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: -2
+                    }
+                    
+                    Switch {
+                        id: forcedExerciseSwitch
+                        checked: appConfig.forcedExercise
+                        onToggled: appConfig.forcedExercise = checked
+                        
+                        scale: 0.7
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        
+                        indicator: Rectangle {
+                            implicitWidth: 40
+                            implicitHeight: 20
+                            radius: 10
+                            color: parent.checked ? mainWindow.themeColor : "#33ffffff"
+                            border.color: parent.checked ? mainWindow.themeColor : "#cccccc"
+                            
+                            Rectangle {
+                                x: parent.parent.checked ? parent.width - width - 2 : 2
+                                width: 16
+                                height: 16
+                                radius: 8
+                                color: "white"
+                                anchors.verticalCenter: parent.verticalCenter
+                                Behavior on x { NumberAnimation { duration: 100 } }
+                            }
+                        }
+                    }
+                }
+
+                // 强制运动时长设置 (仅当强制运动开启时显示)
+                Item {
+                    width: parent.width
+                    height: 20
+                    visible: appConfig.forcedExercise
+                    opacity: visible ? 1.0 : 0.0
+                    Behavior on opacity { NumberAnimation { duration: 200 } }
+                    
+                    Text {
+                        text: "强制时长"
+                        color: "#999999"
+                        font.pixelSize: 12
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 5
+                        
+                        // 减号按钮
+                        Rectangle {
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: "#33ffffff"
+                            border.color: "#66ffffff"
+                            border.width: 1
+                            
+                            Text {
+                                text: "-"
+                                color: "white"
+                                anchors.centerIn: parent
+                                font.pixelSize: 14
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (appConfig.forcedExerciseDuration > 1) {
+                                        appConfig.forcedExerciseDuration -= 1
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 数值显示
+                        Text {
+                            text: appConfig.forcedExerciseDuration + " min"
+                            color: "white"
+                            font.pixelSize: 12
+                            width: 35
+                            horizontalAlignment: Text.AlignHCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        
+                        // 加号按钮
+                        Rectangle {
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: "#33ffffff"
+                            border.color: "#66ffffff"
+                            border.width: 1
+                            
+                            Text {
+                                text: "+"
+                                color: "white"
+                                anchors.centerIn: parent
+                                font.pixelSize: 14
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (appConfig.forcedExerciseDuration < 5) {
+                                        appConfig.forcedExerciseDuration += 1
+                                    }
+                                }
                             }
                         }
                     }

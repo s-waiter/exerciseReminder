@@ -1050,7 +1050,28 @@ Window {
             }
             
             onClicked: {
-                // 1. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
+                // 1. 强制运动拦截逻辑
+                if (appConfig && appConfig.forcedExercise) {
+                    var now = new Date()
+                    var durationSeconds = 0
+                    if(overlayWin.showTime) {
+                        durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
+                    }
+                    var requiredSeconds = appConfig.forcedExerciseDuration * 60
+                    
+                    if (durationSeconds < requiredSeconds) {
+                        var remaining = requiredSeconds - durationSeconds
+                        var rMins = Math.floor(remaining / 60)
+                        var rSecs = remaining % 60
+                        var msg = "强制运动模式开启中，还需坚持 "
+                        if (rMins > 0) msg += rMins + "分"
+                        msg += rSecs + "秒"
+                        showToast(msg)
+                        return
+                    }
+                }
+
+                // 2. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
                 var now = new Date()
                 var durationSeconds = 0
                 if(overlayWin.showTime) {
@@ -1105,8 +1126,118 @@ Window {
             }
             
             onClicked: {
+                if (appConfig && appConfig.forcedExercise) {
+                    var now = new Date()
+                    var durationSeconds = 0
+                    if(overlayWin.showTime) {
+                        durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
+                    }
+                    var requiredSeconds = appConfig.forcedExerciseDuration * 60
+                    
+                    if (durationSeconds < requiredSeconds) {
+                        var remaining = requiredSeconds - durationSeconds
+                        var rMins = Math.floor(remaining / 60)
+                        var rSecs = remaining % 60
+                        var msg = "强制运动模式开启中，还需坚持 "
+                        if (rMins > 0) msg += rMins + "分"
+                        msg += rSecs + "秒"
+                        showToast(msg)
+                        return
+                    }
+                }
                 overlayWin.snoozeRequested()
             }
         }
+    }
+
+    // ========================================================================
+    // Toast Notification (Forced Exercise Warning)
+    // ========================================================================
+    Rectangle {
+        id: toast
+        // Adaptive width: Padding + Indicator + Spacing + Text + Padding
+        width: toastText.implicitWidth + 50 
+        height: 40
+        radius: 20
+        
+        // Visual Style matching app theme (Glassmorphism / Dark Blue)
+        color: "#E61B2A4E" // High opacity dark blue for better readability
+        border.color: "#33ffffff"
+        border.width: 1
+        
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 180 // Initial position for animation
+        
+        z: 2000 // Topmost
+        
+        // Initial state
+        opacity: 0
+        visible: opacity > 0
+        scale: 0.9
+
+        // Icon/Indicator
+        Rectangle {
+            id: indicator
+            width: 8
+            height: 8
+            radius: 4
+            color: "#FF4444" // Red for warning
+            anchors.left: parent.left
+            anchors.leftMargin: 15
+            anchors.verticalCenter: parent.verticalCenter
+            
+            // Breathing animation for the indicator
+            SequentialAnimation on opacity {
+                running: toast.visible
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.4; duration: 800 }
+                NumberAnimation { to: 1.0; duration: 800 }
+            }
+        }
+
+        Text {
+            id: toastText
+            anchors.left: indicator.right
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            color: "white"
+            font.pixelSize: 14
+            font.bold: true
+            font.family: "Microsoft YaHei UI"
+        }
+
+        // Show Animation
+        ParallelAnimation {
+            id: toastShowAnim
+            NumberAnimation { target: toast; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutQuad }
+            NumberAnimation { target: toast; property: "scale"; to: 1; duration: 200; easing.type: Easing.OutBack }
+            NumberAnimation { target: toast; property: "anchors.bottomMargin"; to: 200; duration: 200; easing.type: Easing.OutQuad }
+        }
+
+        // Hide Animation
+        NumberAnimation {
+            id: toastHideAnim
+            target: toast
+            property: "opacity"
+            to: 0
+            duration: 300
+            easing.type: Easing.InQuad
+        }
+
+        // Auto-hide Timer
+        Timer {
+            id: toastTimer
+            interval: 3500 // Slightly longer for reading
+            onTriggered: toastHideAnim.start()
+        }
+    }
+
+    function showToast(message) {
+        toastText.text = message
+        // Reset properties for animation
+        toast.anchors.bottomMargin = 180
+        toastShowAnim.restart()
+        toastTimer.restart()
     }
 }

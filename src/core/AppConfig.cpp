@@ -54,6 +54,47 @@ bool AppConfig::isAutoStart() const
 }
 
 // ========================================================================
+// 读取/设置：强制运动模式
+// ========================================================================
+bool AppConfig::isForcedExercise() const
+{
+    QSettings settings("TraeAI", "DeskCare");
+    return settings.value("forcedExercise", false).toBool();
+}
+
+void AppConfig::setForcedExercise(bool enabled)
+{
+    QSettings settings("TraeAI", "DeskCare");
+    if (isForcedExercise() != enabled) {
+        settings.setValue("forcedExercise", enabled);
+        emit forcedExerciseChanged(enabled);
+    }
+}
+
+// ========================================================================
+// 读取/设置：强制运动时长
+// ========================================================================
+int AppConfig::forcedExerciseDuration() const
+{
+    QSettings settings("TraeAI", "DeskCare");
+    int val = settings.value("forcedExerciseDuration", 1).toInt();
+    if (val < 1) val = 1;
+    if (val > 5) val = 5;
+    return val;
+}
+
+void AppConfig::setForcedExerciseDuration(int minutes)
+{
+    if (minutes < 1 || minutes > 5) return;
+    
+    QSettings settings("TraeAI", "DeskCare");
+    if (forcedExerciseDuration() != minutes) {
+        settings.setValue("forcedExerciseDuration", minutes);
+        emit forcedExerciseDurationChanged(minutes);
+    }
+}
+
+// ========================================================================
 // 设置：是否开机自启
 // ========================================================================
 // 修改系统的开机自启设置。

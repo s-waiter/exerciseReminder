@@ -25,6 +25,10 @@ class AppConfig : public QObject
     // NOTIFY: 状态变更信号
     Q_PROPERTY(bool autoStart READ isAutoStart WRITE setAutoStart NOTIFY autoStartChanged)
 
+    // 强制运动相关属性
+    Q_PROPERTY(bool forcedExercise READ isForcedExercise WRITE setForcedExercise NOTIFY forcedExerciseChanged)
+    Q_PROPERTY(int forcedExerciseDuration READ forcedExerciseDuration WRITE setForcedExerciseDuration NOTIFY forcedExerciseDurationChanged)
+
 public:
     explicit AppConfig(QObject *parent = nullptr);
 
@@ -34,9 +38,21 @@ public:
     // 设置是否开机自启
     void setAutoStart(bool autoStart);
 
+    // 读取是否开启强制运动
+    bool isForcedExercise() const;
+    // 设置是否开启强制运动
+    void setForcedExercise(bool enabled);
+
+    // 读取强制运动时长 (分钟)
+    int forcedExerciseDuration() const;
+    // 设置强制运动时长 (分钟)
+    void setForcedExerciseDuration(int minutes);
+
 signals:
     // 当开机自启状态改变时触发
     void autoStartChanged(bool autoStart);
+    void forcedExerciseChanged(bool enabled);
+    void forcedExerciseDurationChanged(int minutes);
 
 private:
     // Windows 注册表路径，用于设置开机自启
