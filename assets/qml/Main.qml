@@ -97,23 +97,24 @@ Window {
     property bool animationEnabled: true
     
     // 当 width, height, x, y 发生变化时，不立即突变，而是应用缓动动画。
-    // duration: 400ms (增加时长以获得更平滑的视觉效果)
-    // easing.type: Easing.OutQuint (五次方的缓出曲线，开始快结束慢，手感自然)
+    // 极致丝滑配置：
+    // duration: 600ms (延长时长以展示 OutExpo 尾部极其细腻的减速过程)
+    // easing.type: Easing.OutExpo (指数级缓出，启动极快，刹车如羽毛般轻盈，是高端 UI 的标配)
     Behavior on width { 
         enabled: animationEnabled
-        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
     }
     Behavior on height { 
         enabled: animationEnabled
-        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
     }
     Behavior on x { 
         enabled: animationEnabled
-        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
     }
     Behavior on y { 
         enabled: animationEnabled
-        NumberAnimation { duration: 400; easing.type: Easing.OutQuint } 
+        NumberAnimation { duration: 600; easing.type: Easing.OutExpo } 
     }
 
     // ========================================================================
@@ -250,7 +251,7 @@ Window {
                 height: bgContainer.height
                 // 迷你模式下变成圆形 (width/2)，正常模式下是大圆角 (20)
                 radius: isPinned ? width / 2 : 20
-                Behavior on radius { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                Behavior on radius { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                 visible: false
             }
         }
@@ -286,12 +287,12 @@ Window {
                 y: isPinned ? (parent.height - height) / 2 : -40
                 
                 // 尺寸平滑过渡
-                Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                 
                 // 位置平滑过渡
-                Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                Behavior on x { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                Behavior on y { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                 
                 // 呼吸动画：透明度在 0.05 到 0.15 之间循环
                 SequentialAnimation on opacity {
@@ -307,7 +308,7 @@ Window {
             id: titleBar
             width: parent.width
             height: isPinned ? 20 : 40
-            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
             anchors.top: parent.top
             z: 10 
             
@@ -477,11 +478,11 @@ Window {
             // 配合 onIsPinnedChanged 中的窗口坐标补偿，实现视觉位置静止
             anchors.topMargin: isPinned ? 10 : 60
             
-            // 关键：尺寸和 Margin 动画必须与窗口几何动画完全同步 (duration/easing 一致)
-            // 这样 WindowY(t) + TopMargin(t) = Constant，从而消除视觉抖动
-            Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-            Behavior on anchors.topMargin { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+            // 关键：TopMargin 必须严格同步 Window 几何动画 (OutExpo)，消除抖动
+            // Width/Height 使用带轻微回弹的曲线 (OutBack)，增加活力与弹性
+            Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutBack; easing.overshoot: 0.6 } }
+            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutBack; easing.overshoot: 0.6 } }
+            Behavior on anchors.topMargin { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
             
             // 外圈轨道
             Rectangle {
@@ -690,8 +691,8 @@ Window {
                     opacity: active ? 1.0 : 0.0
                     scale: active ? 1.0 : 0.8 // 退出时缩小，营造空间纵深感
                     
-                    Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                    Behavior on scale { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                    Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                    Behavior on scale { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
 
                     Column {
                         anchors.centerIn: parent
@@ -710,7 +711,7 @@ Window {
                             font.weight: Font.Light
                             anchors.horizontalCenter: parent.horizontalCenter
                             
-                            Behavior on font.pixelSize { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on font.pixelSize { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                         }
                         
                         Text {
@@ -725,10 +726,10 @@ Window {
                             
                             // 高度动画实现平滑布局挤压
                             height: isPinned ? 0 : implicitHeight
-                            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                            Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                             
-                            Behavior on font.pixelSize { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on font.pixelSize { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                         }
 
                         // 预计结束时间 (ETA) - 正常模式下显示
@@ -743,8 +744,8 @@ Window {
                             visible: opacity > 0
                             
                             height: visible ? implicitHeight : 0
-                            Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
+                            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                            Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
                             
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
