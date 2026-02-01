@@ -19,6 +19,7 @@ public:
     explicit UpdateManager(QObject *parent = nullptr);
     Q_INVOKABLE void checkForUpdates(bool silent = true);
     Q_INVOKABLE void startInstall(); // Start the updater process
+    Q_INVOKABLE void resetStatus(); // Reset status and progress
     
     QString currentVersion() const;
     QString remoteVersion() const { return m_remoteVersion; }

@@ -57,6 +57,14 @@ void UpdateManager::checkForUpdates(bool silent)
     connect(m_currentReply, &QNetworkReply::finished, this, &UpdateManager::onVersionCheckFinished);
 }
 
+void UpdateManager::resetStatus()
+{
+    m_updateStatus = "";
+    m_downloadProgress = 0.0;
+    emit updateStatusChanged();
+    emit downloadProgressChanged();
+}
+
 void UpdateManager::onVersionCheckFinished()
 {
     if (!m_currentReply) {

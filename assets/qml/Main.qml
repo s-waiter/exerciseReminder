@@ -307,7 +307,7 @@ Window {
                 }
 
                 Text {
-                    text: "久坐提醒助手"
+                    text: "久坐运动提醒"
                     color: "#FFFFFF"
                     opacity: 0.75 // 提高不透明度，确保清晰可见
                     font.family: "Microsoft YaHei UI"
@@ -703,7 +703,7 @@ Window {
 
                         // 预计结束时间 (ETA) - 正常模式下显示
                         Text {
-                            text: "预计 " + timerEngine.estimatedFinishTime + " 休息"
+                            text: "预计 " + timerEngine.estimatedFinishTime + " 运动"
                             color: "#8899A6" // 弱化显示
                             font.pixelSize: 12
                             font.family: "Microsoft YaHei UI"
@@ -748,7 +748,7 @@ Window {
                         
                         // Label: 说明
                         Text {
-                            text: "预计休息"
+                            text: "预计运动"
                             color: mainWindow.themeColor // 跟随动态主题色
                             font.pixelSize: 10
                             font.family: "Microsoft YaHei UI" // 强制使用微软雅黑，拒绝宋体
@@ -796,7 +796,7 @@ Window {
                     interval: 250 // 延迟 250ms 执行三击动作
                     repeat: false
                     onTriggered: {
-                        // 触发立即休息
+                        // 触发立即运动
                         themeController.generateRandomTheme()
                         isReminderActive = true
                     }
@@ -1091,7 +1091,7 @@ Window {
                 }
 
                 CyberButton {
-                    text: "立即休息"
+                    text: "立即运动"
                     btnColor: "#3a7bd5"
                     onClicked: {
                         themeController.generateRandomTheme()
