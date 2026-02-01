@@ -24,6 +24,19 @@ Window {
         
         // 检查是否是开机自启
         if (isAutoStartLaunch) {
+            // 使用 Timer 延迟执行位置设置，确保屏幕信息已就绪且避免初始化冲突
+            autoStartTimer.start()
+        } else {
+            // 标记初始化完成
+            isInitialized = true
+        }
+    }
+
+    Timer {
+        id: autoStartTimer
+        interval: 100 // 稍微延迟以确保窗口系统准备就绪
+        repeat: false
+        onTriggered: {
             // 如果是开机自启，则直接进入 Mini 模式 (悬浮球)
             // 先禁用动画，避免飞入效果
             animationEnabled = false
@@ -31,21 +44,31 @@ Window {
             isPinned = true
             
             // 计算屏幕右上角位置
-            // 假设屏幕边距 20px
-            var screenGeometry = Qt.application.screens[0].desktopAvailableGeometry
-            // 悬浮球尺寸 120x120
-            var targetX = screenGeometry.width - 120 - 50 // 右侧留出 50px 边距
-            var targetY = 100 // 顶部留出 100px 边距
+            var screen = Qt.application.screens[0]
+            if (screen) {
+                var geo = screen.desktopAvailableGeometry
+                // 悬浮球尺寸 120x120
+                // 必须加上 geo.x 以支持多显示器或非零起始点
+                var targetX = geo.x + geo.width - 120 - 50 // 右侧留出 50px 边距
+                var targetY = geo.y + 100 // 顶部留出 100px 边距
+                
+                mainWindow.x = targetX
+                mainWindow.y = targetY
+            }
             
-            mainWindow.x = targetX
-            mainWindow.y = targetY
+            // 恢复动画 (延迟一点点确保位置生效后)
+            enableAnimTimer.start()
             
-            // 恢复动画
-            animationEnabled = true
+            // 标记初始化完成
+            isInitialized = true
         }
-        
-        // 标记初始化完成
-        isInitialized = true
+    }
+    
+    Timer {
+        id: enableAnimTimer
+        interval: 100
+        repeat: false
+        onTriggered: animationEnabled = true
     }
     
     // 动态调整窗口大小：
