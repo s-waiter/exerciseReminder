@@ -76,10 +76,22 @@ Window {
     // 当 width, height, x, y 发生变化时，不立即突变，而是应用缓动动画。
     // duration: 300ms
     // easing.type: Easing.OutQuint (五次方的缓出曲线，开始快结束慢，手感自然)
-    Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
-    Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
-    Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
-    Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint; enabled: animationEnabled } }
+    Behavior on width { 
+        enabled: animationEnabled
+        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+    }
+    Behavior on height { 
+        enabled: animationEnabled
+        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+    }
+    Behavior on x { 
+        enabled: animationEnabled
+        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+    }
+    Behavior on y { 
+        enabled: animationEnabled
+        NumberAnimation { duration: 300; easing.type: Easing.OutQuint } 
+    }
 
     // ========================================================================
     // 动态主题色逻辑

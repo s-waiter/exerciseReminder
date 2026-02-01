@@ -18,10 +18,16 @@ AppConfig::AppConfig(QObject *parent) : QObject(parent)
         QSettings settings(REG_RUN_KEY, QSettings::NativeFormat);
         QString currentValue = settings.value(APP_NAME).toString();
         
-        // 如果当前值不包含 --autostart，说明是旧版本的设置
-        if (!currentValue.contains("--autostart")) {
-            qDebug() << "Detected legacy auto-start registry key. Updating...";
-            setAutoStart(true); // 重新设置会写入带参数的新值
+        // 获取当前期望的完整注册表值
+        QString appPath = QCoreApplication::applicationFilePath();
+        QString nativePath = QDir::toNativeSeparators(appPath);
+        QString expectedValue = "\"" + nativePath + "\" --autostart";
+
+        // 如果当前值与期望值不一致（包括路径改变、参数缺失等情况），则更新
+        // 这也解决了文件夹重命名后自启路径失效的问题
+        if (currentValue != expectedValue) {
+            qDebug() << "Auto-start registry key mismatch (Path/Args). Updating...";
+            setAutoStart(true); 
         }
     }
 #endif
