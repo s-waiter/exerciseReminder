@@ -1642,195 +1642,27 @@ Window {
 
         // Update Dialog Overlay
         // ========================================================================
-        Rectangle {
+        Loader {
             id: updateDialog
-            visible: false
             anchors.centerIn: parent
-            width: 200 // 更小巧的宽度
-            height: 140 // 更紧凑的高度
-            radius: 16 // 更柔和的圆角
-            color: "#F01B2A4E" // 增加不透明度，提升质感
-            border.color: dialogMouseArea.containsMouse ? 
-                          Qt.lighter(mainWindow.themeColor, 1.3) : 
-                          Qt.rgba(mainWindow.themeColor.r, mainWindow.themeColor.g, mainWindow.themeColor.b, 0.3)
-            border.width: 1
-            
-            // 悬浮放大特效
-            scale: dialogMouseArea.containsMouse ? 1.05 : 1.0
-            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
-            Behavior on border.color { ColorAnimation { duration: 200 } }
+            active: false
+            source: "UpdateDialog.qml"
+            z: 200
 
-            // 玻璃拟态光效 (顶部高光)
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.2)
-                anchors.top: parent.top
-                anchors.topMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-
-            // 属性：下载状态
-            property bool isDownloading: false
-            
             function open() {
-                visible = true
-                isDownloading = false
-                updateManager.resetStatus()
-            }
-            
-            function close() {
-                visible = false
+                if (active) {
+                    item.open()
+                } else {
+                    active = true
+                }
             }
 
-            // 阻止鼠标点击穿透 + 悬浮检测
-            MouseArea {
-                id: dialogMouseArea
-                anchors.fill: parent
-                hoverEnabled: true 
-                onClicked: {} // 拦截点击
-            }
-
-            // 内容布局
-            Column {
-                anchors.centerIn: parent
-                width: parent.width - 30
-                spacing: 8
-
-                // 标题与版本号组合
-                Item {
-                    width: parent.width
-                    height: 30
-                    visible: !updateDialog.isDownloading
-                    
-                    Text {
-                        text: "发现新版本"
-                        color: "#8899AA"
-                        font.pixelSize: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.top: parent.top
-                    }
-                    
-                    Text {
-                        text: "v" + updateManager.remoteVersion
-                        color: mainWindow.themeColor
-                        font.pixelSize: 18 // 放大版本号作为视觉重心
-                        font.bold: true
-                        font.family: "Segoe UI"
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                    }
-                }
-                
-                // 状态/进度区域
-                Item {
-                    width: parent.width
-                    height: 40
-                    
-                    // 1. 简短询问 (非下载状态)
-                    Text {
-                        visible: !updateDialog.isDownloading
-                        text: "立即更新体验新功能?"
-                        color: "#DDDDDD"
-                        font.pixelSize: 11
-                        anchors.centerIn: parent
-                        opacity: 0.8
-                    }
-                    
-                    // 2. 进度条 (下载时显示)
-                    Rectangle {
-                        id: progressBar
-                        visible: updateDialog.isDownloading
-                        width: parent.width
-                        height: 4
-                        radius: 2
-                        color: "#33000000"
-                        anchors.centerIn: parent
-                        
-                        Rectangle {
-                            height: parent.height
-                            width: parent.width * updateManager.downloadProgress
-                            color: mainWindow.themeColor
-                            radius: 2
-                        }
-                    }
-                    
-                    // 3. 下载状态文本
-                    Text {
-                        visible: updateDialog.isDownloading
-                        text: updateManager.updateStatus
-                        color: "#AAAAAA"
-                        font.pixelSize: 9
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        horizontalAlignment: Text.AlignHCenter
-                        anchors.top: progressBar.bottom
-                        anchors.topMargin: 5
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                }
-
-                // 按钮组
-                Row {
-                    spacing: 10
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: !updateDialog.isDownloading
-
-                    // 暂不按钮 (纯文字，极简)
-                    Rectangle {
-                        width: 70
-                        height: 28
-                        color: "transparent"
-                        radius: 14
-                        
-                        Text {
-                            text: "稍后"
-                            color: hoverHandler1.hovered ? "#FFFFFF" : "#8899AA"
-                            anchors.centerIn: parent
-                            font.pixelSize: 11
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                        
-                        HoverHandler { id: hoverHandler1 }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: updateDialog.close()
-                        }
-                    }
-
-                    // 立即更新按钮 (高亮胶囊)
-                    Rectangle {
-                        width: 80
-                        height: 28
-                        color: mainWindow.themeColor
-                        radius: 14
-                        // 简单的光泽感
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Qt.lighter(mainWindow.themeColor, 1.2) }
-                            GradientStop { position: 1.0; color: mainWindow.themeColor }
-                        }
-                        
-                        Text {
-                            text: "更新"
-                            // 优化对比度：使用深色文字 (#0B1015) 搭配高亮背景
-                            color: "#0B1015" 
-                            anchors.centerIn: parent
-                            font.bold: true
-                            font.pixelSize: 11
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                updateDialog.isDownloading = true
-                                updateManager.startDownload("")
-                            }
-                        }
-                    }
-                }
+            onLoaded: {
+                item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
+                item.open()
+                item.visibleChanged.connect(function() {
+                    if (!item.visible) active = false
+                })
             }
         }
     }
@@ -1839,262 +1671,27 @@ Window {
     // 设置弹窗 (Settings Overlay)
     // ========================================================================
     // 采用与 UpdateDialog 完全一致的视觉风格
-    Item {
+    Loader {
         id: settingsOverlay
         anchors.fill: parent
-        visible: false
-        z: 200 // 确保在最上层
-        
-        function open() { visible = true }
-        function close() { visible = false }
+        active: false
+        source: "SettingsOverlay.qml"
+        z: 200
 
-        // 点击背景关闭
-        MouseArea {
-            anchors.fill: parent
-            onClicked: settingsOverlay.close()
+        function open() {
+            if (active) {
+                item.open()
+            } else {
+                active = true
+            }
         }
-        
-        Rectangle {
-            id: settingsDialog
-            anchors.centerIn: parent
-            width: 200 
-            height: 140 
-            radius: 16 
-            color: "#F01B2A4E" // 增加不透明度，提升质感
-            border.color: settingsDialogMouseArea.containsMouse ? 
-                          Qt.lighter(mainWindow.themeColor, 1.3) : 
-                          Qt.rgba(mainWindow.themeColor.r, mainWindow.themeColor.g, mainWindow.themeColor.b, 0.3)
-            border.width: 1
-            
-            // 悬浮放大特效
-            scale: settingsDialogMouseArea.containsMouse ? 1.05 : 1.0
-            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
-            Behavior on border.color { ColorAnimation { duration: 200 } }
 
-            // 玻璃拟态光效 (顶部高光)
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.2)
-                anchors.top: parent.top
-                anchors.topMargin: 1
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-            
-            // 阻止点击穿透 + 悬浮检测
-            MouseArea {
-                id: settingsDialogMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {} // 拦截点击
-            }
-            
-            // 内容
-            Column {
-                anchors.centerIn: parent
-                width: parent.width - 30
-                spacing: 12
-                
-                Text {
-                    text: "偏好设置"
-                    color: "white"
-                    font.pixelSize: 14
-                    font.bold: true
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-                
-                // 分割线
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: "#22ffffff"
-                }
-                
-                // 开机自启开关
-                Item {
-                    width: parent.width
-                    height: 20
-                    
-                    Text {
-                        text: "开机自启"
-                        color: "#DDDDDD"
-                        font.pixelSize: 12
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -2 // 向上微调 2px 以视觉对齐右侧开关
-                    }
-                    
-                    Switch {
-                        checked: appConfig.autoStart
-                        onToggled: appConfig.autoStart = checked
-                        
-                        scale: 0.7 // 稍微缩小开关以适应紧凑布局
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        
-                        indicator: Rectangle {
-                            implicitWidth: 40
-                            implicitHeight: 20
-                            radius: 10
-                            color: parent.checked ? mainWindow.themeColor : "#33ffffff"
-                            border.color: parent.checked ? mainWindow.themeColor : "#cccccc"
-                            
-                            Rectangle {
-                                x: parent.parent.checked ? parent.width - width - 2 : 2
-                                width: 16
-                                height: 16
-                                radius: 8
-                                color: "white"
-                                anchors.verticalCenter: parent.verticalCenter
-                                Behavior on x { NumberAnimation { duration: 100 } }
-                            }
-                        }
-                    }
-                }
-
-                // 强制运动开关
-                Item {
-                    width: parent.width
-                    height: 20
-                    
-                    Text {
-                        text: "强制运动"
-                        color: "#DDDDDD"
-                        font.pixelSize: 12
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -2
-                    }
-                    
-                    Switch {
-                        id: forcedExerciseSwitch
-                        checked: appConfig.forcedExercise
-                        onToggled: appConfig.forcedExercise = checked
-                        
-                        scale: 0.7
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        
-                        indicator: Rectangle {
-                            implicitWidth: 40
-                            implicitHeight: 20
-                            radius: 10
-                            color: parent.checked ? mainWindow.themeColor : "#33ffffff"
-                            border.color: parent.checked ? mainWindow.themeColor : "#cccccc"
-                            
-                            Rectangle {
-                                x: parent.parent.checked ? parent.width - width - 2 : 2
-                                width: 16
-                                height: 16
-                                radius: 8
-                                color: "white"
-                                anchors.verticalCenter: parent.verticalCenter
-                                Behavior on x { NumberAnimation { duration: 100 } }
-                            }
-                        }
-                    }
-                }
-
-                // 强制运动时长设置 (仅当强制运动开启时显示)
-                Item {
-                    width: parent.width
-                    height: 20
-                    visible: appConfig.forcedExercise
-                    opacity: visible ? 1.0 : 0.0
-                    Behavior on opacity { NumberAnimation { duration: 200 } }
-                    
-                    Text {
-                        text: "强制时长"
-                        color: "#999999"
-                        font.pixelSize: 12
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Row {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 5
-                        
-                        // 减号按钮
-                        Rectangle {
-                            width: 20
-                            height: 20
-                            radius: 10
-                            color: "#33ffffff"
-                            border.color: "#66ffffff"
-                            border.width: 1
-                            
-                            Text {
-                                text: "-"
-                                color: "white"
-                                anchors.centerIn: parent
-                                font.pixelSize: 14
-                            }
-                            
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (appConfig.forcedExerciseDuration > 1) {
-                                        appConfig.forcedExerciseDuration -= 1
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // 数值显示
-                        Text {
-                            text: appConfig.forcedExerciseDuration + " min"
-                            color: "white"
-                            font.pixelSize: 12
-                            width: 35
-                            horizontalAlignment: Text.AlignHCenter
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        
-                        // 加号按钮
-                        Rectangle {
-                            width: 20
-                            height: 20
-                            radius: 10
-                            color: "#33ffffff"
-                            border.color: "#66ffffff"
-                            border.width: 1
-                            
-                            Text {
-                                text: "+"
-                                color: "white"
-                                anchors.centerIn: parent
-                                font.pixelSize: 14
-                            }
-                            
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (appConfig.forcedExerciseDuration < 5) {
-                                        appConfig.forcedExerciseDuration += 1
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // 进入动画
-            onVisibleChanged: {
-                if (visible) {
-                    enterAnim.restart()
-                }
-            }
-            
-            ParallelAnimation {
-                id: enterAnim
-                NumberAnimation { target: settingsDialog; property: "opacity"; from: 0.0; to: 1.0; duration: 200 }
-                NumberAnimation { target: settingsDialog; property: "scale"; from: 0.9; to: 1.0; duration: 200; easing.type: Easing.OutBack }
-            }
+        onLoaded: {
+            item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
+            item.open()
+            item.visibleChanged.connect(function() {
+                if (!item.visible) active = false
+            })
         }
     }
 
