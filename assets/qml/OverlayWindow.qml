@@ -19,10 +19,12 @@ Window {
     flags: Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
     
     // 显式设置几何属性以防止某些环境下显示异常
-    width: Screen.width
-    height: Screen.height
-    x: 0
-    y: 0
+    // 修正：使用 screen.virtualGeometry.x/y 支持多显示器
+    // 优先使用 virtualGeometry，它是 Qt5/6 标准属性
+    width: screen ? (screen.virtualGeometry ? screen.virtualGeometry.width : screen.width) : Screen.width
+    height: screen ? (screen.virtualGeometry ? screen.virtualGeometry.height : screen.height) : Screen.height
+    x: screen ? (screen.virtualGeometry ? screen.virtualGeometry.x : 0) : 0
+    y: screen ? (screen.virtualGeometry ? screen.virtualGeometry.y : 0) : 0
     
     // visibility: Window.FullScreen // 移除初始的 visibility 设置，避免冲突
     color: "transparent"
@@ -43,10 +45,15 @@ Window {
     onVisibleChanged: {
         if(visible) {
             // 确保几何属性正确 (防止多屏环境下的位置偏移)
-            width = Screen.width
-            height = Screen.height
-            x = 0
-            y = 0
+            if (screen) {
+                width = screen.width
+                height = screen.height
+                // Qt 5.15 中 QScreen 对象通常具有 virtualX 属性，但为了最大兼容性
+                // 建议检查 virtualGeometry。然而在 QML 中，Screen 对象通常直接暴露 virtualX
+                // 如果 screen 是从 Qt.application.screens 获取的 modelData
+                x = (typeof screen.virtualX !== "undefined") ? screen.virtualX : (screen.virtualGeometry ? screen.virtualGeometry.x : 0)
+                y = (typeof screen.virtualY !== "undefined") ? screen.virtualY : (screen.virtualGeometry ? screen.virtualGeometry.y : 0)
+            }
             
             showTime = new Date()
             
@@ -185,7 +192,9 @@ Window {
         ParticleSystem {
             id: celebrationSys
             anchors.fill: parent
-            running: feedbackLayer.visible
+            // 严格的运行条件：只有在反馈层显示且窗口本身可见时才运行
+            // 这确保了窗口关闭后，粒子系统彻底停止，不占用任何 CPU/GPU
+            running: feedbackLayer.visible && overlayWin.visible
             
             ItemParticle {
                 delegate: Rectangle {

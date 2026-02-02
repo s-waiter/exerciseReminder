@@ -206,6 +206,25 @@ Window {
             mainWindow.x -= 80
             mainWindow.y -= 75
         }
+        
+        // 内存优化：延迟 GC
+        // 模式切换伴随着复杂的尺寸和透明度动画 (600ms)。
+        // 如果立即 GC，不仅会卡顿动画，而且此时旧的纹理可能还在被动画引用，无法真正释放。
+        // 我们在动画结束后执行 GC，效果最好。
+        gcTimer.restart()
+    }
+    
+    // 垃圾回收专用定时器
+    Timer {
+        id: gcTimer
+        interval: 1000 // 1秒后执行 (动画时长600ms + 缓冲)
+        repeat: false
+        onTriggered: {
+            if (typeof gc === 'function') {
+                // print("执行内存回收 (GC)...")
+                gc()
+            }
+        }
     }
     
     // ========================================================================
@@ -1706,20 +1725,48 @@ Window {
     // 多屏实例化全屏提醒窗口
     Instantiator {
         model: Qt.application.screens
-        delegate: OverlayWindow {
-            screen: modelData // 绑定到对应屏幕
-            themeData: themeController.currentTheme
-            // 只有当全局提醒激活且不在午休模式时显示
-            visible: isReminderActive && !timerEngine.isNapMode
+        // 使用 Loader 进行懒加载和资源自动回收
+        delegate: Loader {
+            // 只有当全局提醒激活且不在午休模式时加载
+            // 加载时创建 Window，不加载时销毁 Window 及其所有资源 (粒子、Canvas等)
+            active: isReminderActive && !timerEngine.isNapMode
             
-            onReminderFinished: {
-                isReminderActive = false
-                // 自动开启下一轮工作倒计时
-                timerEngine.startWork()
+            sourceComponent: OverlayWindow {
+                screen: modelData // 绑定到对应屏幕
+                themeData: themeController.currentTheme
+                
+                // 注意：对于 Window 对象，Loader 加载后不会自动显示，
+                // 必须在 onLoaded 中显式调用 show() 或设置 visible=true
+                
+                onReminderFinished: {
+                    isReminderActive = false
+                    // 自动开启下一轮工作倒计时
+                    timerEngine.startWork()
+                }
+                onSnoozeRequested: {
+                    timerEngine.snooze()
+                    isReminderActive = false
+                }
             }
-            onSnoozeRequested: {
-                timerEngine.snooze()
-                isReminderActive = false
+
+            onLoaded: {
+                if (item) {
+                    // 强制设置几何属性，确保在多显示器环境下位置正确
+                    // 虽然 OverlayWindow 内部有绑定，但在某些 Qt 版本中，
+                    // Window 创建初期的 screen 属性同步可能存在延迟，导致位置错乱。
+                    // 这里显式设置 x,y,width,height 是双重保险。
+                    if (modelData && modelData.virtualGeometry) {
+                        item.x = modelData.virtualGeometry.x
+                        item.y = modelData.virtualGeometry.y
+                        item.width = modelData.virtualGeometry.width
+                        item.height = modelData.virtualGeometry.height
+                    }
+                    
+                    item.visible = true
+                    item.showFullScreen()
+                    item.raise()
+                    item.requestActivate()
+                }
             }
         }
     }
