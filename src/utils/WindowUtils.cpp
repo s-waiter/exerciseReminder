@@ -1,5 +1,8 @@
 #include "WindowUtils.h"
 #include <QDebug>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QCursor>
 
 // #ifdef Q_OS_WIN 是 Qt 的宏，仅在 Windows 平台编译此段代码
 #ifdef Q_OS_WIN
@@ -142,4 +145,48 @@ void WindowUtils::setTopMost(QObject *window, bool top) {
         qWin->show();
     }
 #endif
+}
+
+QVariantMap WindowUtils::getPrimaryScreenAvailableGeometry() {
+    QVariantMap result;
+    QScreen *primary = QGuiApplication::primaryScreen();
+    if (primary) {
+        QRect geo = primary->availableGeometry();
+        result["x"] = geo.x();
+        result["y"] = geo.y();
+        result["width"] = geo.width();
+        result["height"] = geo.height();
+    } else {
+        // Fallback defaults
+        result["x"] = 0;
+        result["y"] = 0;
+        result["width"] = 1920;
+        result["height"] = 1080;
+    }
+    return result;
+}
+
+QVariantMap WindowUtils::getScreenGeometryAtCursor() {
+    QVariantMap result;
+    QScreen *targetScreen = QGuiApplication::screenAt(QCursor::pos());
+    
+    // 如果找不到（极少情况），回退到主屏幕
+    if (!targetScreen) {
+        targetScreen = QGuiApplication::primaryScreen();
+    }
+
+    if (targetScreen) {
+        QRect geo = targetScreen->availableGeometry();
+        result["x"] = geo.x();
+        result["y"] = geo.y();
+        result["width"] = geo.width();
+        result["height"] = geo.height();
+    } else {
+        // 彻底的 Fallback
+        result["x"] = 0;
+        result["y"] = 0;
+        result["width"] = 1920;
+        result["height"] = 1080;
+    }
+    return result;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <QObject>
 #include <QWindow>
+#include <QVariantMap>
 
 // ========================================================================
 // WindowUtils 类：窗口工具类
@@ -23,6 +24,14 @@ public:
     // 参数 window: QML 中的 Window 对象在 C++ 中对应为 QWindow 或 QQuickWindow。
     // 参数 top: true 为置顶，false 为取消置顶。
     Q_INVOKABLE void setTopMost(QObject *window, bool top);
+
+    // 获取主屏幕的可用几何区域 (x, y, width, height)
+    // 返回值: QVariantMap { "x": int, "y": int, "width": int, "height": int }
+    Q_INVOKABLE QVariantMap getPrimaryScreenAvailableGeometry();
+
+    // 获取当前鼠标所在屏幕的可用几何区域
+    // 用于手动启动时，让窗口出现在用户操作的那个屏幕上
+    Q_INVOKABLE QVariantMap getScreenGeometryAtCursor();
 
 signals:
     // 当系统会话状态改变时触发（true=锁屏, false=解锁）

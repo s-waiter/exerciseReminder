@@ -24,17 +24,40 @@ Window {
         
         // 检查是否是开机自启
         if (isAutoStartLaunch) {
-            // 使用 Timer 延迟执行位置设置，确保屏幕信息已就绪且避免初始化冲突
+            // 开机自启：使用 Timer 延迟执行位置设置，确保屏幕信息已就绪且避免初始化冲突
+            // 延迟时间增加到 300ms，确保系统完全就绪
             autoStartTimer.start()
         } else {
-            // 标记初始化完成
+            // 手动启动：直接展示主界面，并居中显示
+            // 关键修正：先临时禁用动画，确保初始位置设置是瞬时的，而不是从(0,0)飞过来
+            animationEnabled = false
+            centerWindow()
             isInitialized = true
+            // 稍后恢复动画，以便后续的拖拽或模式切换有动画效果
+            enableAnimTimer.start()
+        }
+    }
+
+    // 辅助函数：居中窗口
+    function centerWindow() {
+        // 智能定位：获取鼠标当前所在屏幕的几何信息
+        // 这样用户在哪个屏幕双击启动，窗口就出现在哪个屏幕中央
+        var geo = windowUtils.getScreenGeometryAtCursor()
+        if (geo) {
+            var availW = geo.width
+            var availH = geo.height
+            var startX = geo.x
+            var startY = geo.y
+            
+            // 此时 isPinned 为 false (默认)，使用正常尺寸
+            mainWindow.x = startX + (availW - mainWindow.width) / 2
+            mainWindow.y = startY + (availH - mainWindow.height) / 2
         }
     }
 
     Timer {
         id: autoStartTimer
-        interval: 100 // 稍微延迟以确保窗口系统准备就绪
+        interval: 300 // 增加延迟以确保窗口系统准备就绪 (100ms -> 300ms)
         repeat: false
         onTriggered: {
             // 如果是开机自启，则直接进入 Mini 模式 (悬浮球)
@@ -44,13 +67,16 @@ Window {
             isPinned = true
             
             // 计算屏幕右上角位置
-            var screen = Qt.application.screens[0]
-            if (screen) {
-                var geo = screen.desktopAvailableGeometry
+            // 使用 C++ 提供的准确主屏幕几何信息
+            var geo = windowUtils.getPrimaryScreenAvailableGeometry()
+            if (geo) {
+                var availW = geo.width
+                var startX = geo.x
+                var startY = geo.y
+                
                 // 悬浮球尺寸 120x120
-                // 必须加上 geo.x 以支持多显示器或非零起始点
-                var targetX = geo.x + geo.width - 120 - 50 // 右侧留出 50px 边距
-                var targetY = geo.y + 100 // 顶部留出 100px 边距
+                var targetX = startX + availW - 120 - 50 // 右侧留出 50px 边距
+                var targetY = startY + 100 // 顶部留出 100px 边距
                 
                 mainWindow.x = targetX
                 mainWindow.y = targetY
@@ -59,7 +85,7 @@ Window {
             // 恢复动画 (延迟一点点确保位置生效后)
             enableAnimTimer.start()
             
-            // 标记初始化完成
+            // 标记初始化完成，此时窗口才会变为 visible
             isInitialized = true
         }
     }
@@ -76,7 +102,14 @@ Window {
     // Normal (正常模式): 280x420 (恢复到用户觉得舒适的尺寸)
     width: isPinned ? 120 : 280
     height: isPinned ? 120 : 420
-    visible: true
+    
+    // 完美启动逻辑：
+    // 1. 默认 visible 为 false (由 isInitialized 控制)，确保窗口在定位完成前不可见
+    // 2. Component.onCompleted 中根据启动模式计算位置
+    // 3. 定位完成后设置 isInitialized = true，窗口平滑显示
+    // 这彻底避免了窗口先在屏幕中间闪烁一下再跳到右上角，或在错误位置显示的“视觉抖动”，实现“无感启动”。
+    visible: isInitialized
+    
     title: "DeskCare"
     color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
     
