@@ -17,6 +17,13 @@ Window {
     // 强制全屏 + 置顶 + 无边框
     // Qt.WindowStaysOnTopHint: 确保在所有窗口最上层
     flags: Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
+    
+    // 显式设置几何属性以防止某些环境下显示异常
+    width: Screen.width
+    height: Screen.height
+    x: 0
+    y: 0
+    
     // visibility: Window.FullScreen // 移除初始的 visibility 设置，避免冲突
     color: "transparent"
 
@@ -35,7 +42,23 @@ Window {
     // 窗口可见性改变时的逻辑
     onVisibleChanged: {
         if(visible) {
+            // 确保几何属性正确 (防止多屏环境下的位置偏移)
+            width = Screen.width
+            height = Screen.height
+            x = 0
+            y = 0
+            
             showTime = new Date()
+            
+            // 初始化强制运动倒计时
+            if (appConfig && appConfig.forcedExercise) {
+                totalForcedDuration = appConfig.forcedExerciseDuration * 60
+                remainingForcedSeconds = totalForcedDuration
+                forcedCountdownTimer.restart()
+            } else {
+                remainingForcedSeconds = 0
+            }
+
             showFullScreen() // 确保全屏
             raise()          // 提升窗口层级
             // 重启动画
@@ -74,6 +97,35 @@ Window {
     property var weeklyStats: []
     property var todaySessions: [] // 今日所有会话详情
     property string sessionTimeRange: ""
+
+    // ========================================================================
+    // 强制运动倒计时逻辑
+    // ========================================================================
+    property int remainingForcedSeconds: 0
+    property int totalForcedDuration: 0
+    property bool isForcedLocked: remainingForcedSeconds > 0
+
+    Timer {
+        id: forcedCountdownTimer
+        interval: 100 // 10Hz 刷新以保证进度条平滑
+        repeat: true
+        running: visible && appConfig && appConfig.forcedExercise && remainingForcedSeconds > 0
+        onTriggered: {
+            if (!overlayWin.showTime) return
+            var now = new Date()
+            var elapsed = Math.floor((now - overlayWin.showTime) / 1000)
+            var required = appConfig.forcedExerciseDuration * 60
+            
+            // 更新剩余时间
+            var rem = Math.max(0, required - elapsed)
+            if (rem !== remainingForcedSeconds) {
+                remainingForcedSeconds = rem
+            }
+            
+            // 确保总时长正确 (防止配置在运行时改变)
+            totalForcedDuration = required
+        }
+    }
 
     // 自动关闭计时器 - 已移除，改由 feedbackLayer 的倒计时动画驱动
 
@@ -1011,64 +1063,142 @@ Window {
 
         // 按钮 1: 完成运动
         Button {
+            id: finishBtn
             width: 220
             height: 70
+            topPadding: 0
+            bottomPadding: 0
+            leftPadding: 0
+            rightPadding: 0
+            
+            // 禁用状态下不响应点击（防止误触），但在强制运动倒计时期间保持 enabled 以显示倒计时状态
+            // 只有当 isForcedLocked 为 false 时才是真正的 "完成" 按钮
             
             background: Rectangle {
-                color: parent.down ? "#dddddd" : (parent.hovered ? "#f0f0f0" : "#ffffff")
+                id: btnBg
+                // 正常状态：白色；锁定状态：半透明背景
+                color: overlayWin.isForcedLocked ? "#33ffffff" : (parent.down ? "#dddddd" : (parent.hovered ? "#f0f0f0" : "#ffffff"))
                 radius: 35
                 
-                // 按钮阴影
+                // === 强制运动倒计时进度条 (美化版) ===
+                // 使用 OpacityMask 确保进度条严格贴合圆角
+                Item {
+                    anchors.fill: parent
+                    visible: overlayWin.isForcedLocked
+                    layer.enabled: true
+                    layer.effect: OpacityMask {
+                        maskSource: Rectangle {
+                            width: btnBg.width
+                            height: btnBg.height
+                            radius: btnBg.radius
+                            visible: false
+                        }
+                    }
+
+                    Rectangle {
+                        height: parent.height
+                        // 进度计算：(总时长 - 剩余) / 总时长
+                        width: overlayWin.totalForcedDuration > 0 ? 
+                               parent.width * (1.0 - overlayWin.remainingForcedSeconds / overlayWin.totalForcedDuration) : 0
+                        
+                        // 使用原本按钮的白色作为进度条颜色
+                        color: "#ffffff"
+                        opacity: 0.9 // 稍微一点点透，更有质感
+
+                        // 平滑动画
+                        Behavior on width { NumberAnimation { duration: 100 } }
+                    }
+                }
+                
+                // 按钮阴影 (仅在非锁定状态显示)
                 Rectangle {
                     anchors.fill: parent
                     anchors.topMargin: 5
                     z: -1
                     radius: 35
                     color: "black"
-                    opacity: 0.3
+                    opacity: overlayWin.isForcedLocked ? 0 : 0.3
+                    visible: !overlayWin.isForcedLocked
                 }
                 
-                // 悬停光晕
+                // 悬停光晕 (仅在非锁定状态显示)
                 Rectangle {
                     anchors.fill: parent
                     radius: 35
                     color: "transparent"
                     border.color: "white"
                     border.width: 2
-                    opacity: parent.parent.hovered ? 0.5 : 0
+                    opacity: (!overlayWin.isForcedLocked && parent.parent.hovered) ? 0.5 : 0
                     Behavior on opacity { NumberAnimation { duration: 200 } }
+                }
+                
+                // 锁定状态下的边框
+                border.color: overlayWin.isForcedLocked ? "#44ffffff" : "transparent"
+                border.width: overlayWin.isForcedLocked ? 1 : 0
+            }
+            
+            contentItem: Item {
+                anchors.fill: parent
+                
+                // 1. 正常状态内容
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 8
+                    visible: !overlayWin.isForcedLocked
+                    opacity: visible ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
+                    
+                    Text {
+                        text: "✅"
+                        font.pixelSize: 22
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "完成运动"
+                        color: currentTheme.textColor
+                        font.pixelSize: 22
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+                
+                // 2. 锁定倒计时内容 (仅显示 "完成运动"，但颜色可能需要适配)
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 8
+                    visible: overlayWin.isForcedLocked
+                    opacity: visible ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
+                    
+                    Text {
+                        text: "⏳" 
+                        color: "white" // 在深色背景/白色进度条上，白色可能看不清，这里需要巧妙处理
+                        // 实际上，因为进度条是白色，文字如果是黑色最好。
+                        // 如果进度条没满，背景是半透白，文字也是白色？
+                        // 简单点，用黑色或深色，因为背景最终会变白
+                        // 或者始终保持 "完成运动" 的样式，只是不可点击
+                        // 用户说：不要显示"加油..."，进度条颜色沿用按钮原本颜色(白)。
+                        // 那么文字应该沿用按钮原本文字颜色(黑/深色)。
+                        
+                        font.pixelSize: 22
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "完成运动"
+                        color: currentTheme.textColor // 保持与正常状态一致
+                        font.pixelSize: 22
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
             }
             
-            contentItem: Text {
-                text: "✅ 完成运动"
-                color: currentTheme.textColor
-                font.pixelSize: 22
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            
             onClicked: {
-                // 1. 强制运动拦截逻辑
-                if (appConfig && appConfig.forcedExercise) {
-                    var now = new Date()
-                    var durationSeconds = 0
-                    if(overlayWin.showTime) {
-                        durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
-                    }
-                    var requiredSeconds = appConfig.forcedExerciseDuration * 60
-                    
-                    if (durationSeconds < requiredSeconds) {
-                        var remaining = requiredSeconds - durationSeconds
-                        var rMins = Math.floor(remaining / 60)
-                        var rSecs = remaining % 60
-                        var msg = "强制运动模式开启中，还需坚持 "
-                        if (rMins > 0) msg += rMins + "分"
-                        msg += rSecs + "秒"
-                        showToast(msg)
-                        return
-                    }
+                // 1. 强制运动拦截逻辑 (双重保险，虽然 UI 上已经提示了)
+                if (overlayWin.isForcedLocked) {
+                    var msg = "加油！还需坚持 " + overlayWin.remainingForcedSeconds + " 秒才能完成哦"
+                    showToast(msg)
+                    return
                 }
 
                 // 2. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
@@ -1107,43 +1237,51 @@ Window {
         Button {
             width: 220
             height: 70
+            topPadding: 0
+            bottomPadding: 0
+            leftPadding: 0
+            rightPadding: 0
+            
+            // 当强制锁定时，视觉上变暗
+            opacity: overlayWin.isForcedLocked ? 0.5 : 1.0
+            Behavior on opacity { NumberAnimation { duration: 200 } }
             
             background: Rectangle {
                 color: parent.down ? "#55000000" : (parent.hovered ? "#44000000" : "#33000000")
                 radius: 35
-                border.color: parent.hovered ? "white" : "#e0e0e0"
-                border.width: parent.hovered ? 3 : 2
+                // 锁定时隐藏边框高亮
+                border.color: (!overlayWin.isForcedLocked && parent.hovered) ? "white" : "#e0e0e0"
+                border.width: (!overlayWin.isForcedLocked && parent.hovered) ? 3 : 2
                 Behavior on border.width { NumberAnimation { duration: 100 } }
             }
             
-            contentItem: Text {
-                text: "💤 稍后提醒"
-                color: "#ffffff"
-                font.pixelSize: 22
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            contentItem: Item {
+                anchors.fill: parent
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 8
+                    Text {
+                        text: overlayWin.isForcedLocked ? "🔒" : "💤"
+                        color: "#ffffff"
+                        font.pixelSize: 22
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "稍后提醒"
+                        color: "#ffffff"
+                        font.pixelSize: 22
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
             
             onClicked: {
-                if (appConfig && appConfig.forcedExercise) {
-                    var now = new Date()
-                    var durationSeconds = 0
-                    if(overlayWin.showTime) {
-                        durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
-                    }
-                    var requiredSeconds = appConfig.forcedExerciseDuration * 60
-                    
-                    if (durationSeconds < requiredSeconds) {
-                        var remaining = requiredSeconds - durationSeconds
-                        var rMins = Math.floor(remaining / 60)
-                        var rSecs = remaining % 60
-                        var msg = "强制运动模式开启中，还需坚持 "
-                        if (rMins > 0) msg += rMins + "分"
-                        msg += rSecs + "秒"
-                        showToast(msg)
-                        return
-                    }
+                // 使用统一的锁定状态判断
+                if (overlayWin.isForcedLocked) {
+                    var msg = "强制运动模式下无法推迟哦，请坚持完成！"
+                    showToast(msg)
+                    return
                 }
                 overlayWin.snoozeRequested()
             }
