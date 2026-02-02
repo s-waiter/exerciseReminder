@@ -714,19 +714,56 @@ Window {
                 width: parent.width
                 height: parent.height
                 
+                // 使用 State 和 Transition 明确管理状态切换，避免视觉重叠
+                state: (isPinned && centerMouseArea.containsMouse) ? "PEEK" : "COUNTDOWN"
+
+                states: [
+                    State {
+                        name: "COUNTDOWN"
+                        PropertyChanges { target: countdownState; opacity: 1.0; scale: 1.0 }
+                        PropertyChanges { target: peekState; opacity: 0.0; scale: 1.1 }
+                    },
+                    State {
+                        name: "PEEK"
+                        PropertyChanges { target: countdownState; opacity: 0.0; scale: 0.8 }
+                        PropertyChanges { target: peekState; opacity: 1.0; scale: 1.0 }
+                    }
+                ]
+
+                transitions: [
+                    Transition {
+                        from: "COUNTDOWN"; to: "PEEK"
+                        // 关键修复：串行执行动画。先隐藏倒计时，再显示 Peek，彻底杜绝重叠 ghosting
+                        SequentialAnimation {
+                            ParallelAnimation {
+                                NumberAnimation { target: countdownState; property: "opacity"; duration: 150; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: countdownState; property: "scale"; duration: 150; easing.type: Easing.OutQuad }
+                            }
+                            ParallelAnimation {
+                                NumberAnimation { target: peekState; property: "opacity"; duration: 300; easing.type: Easing.OutCubic }
+                                NumberAnimation { target: peekState; property: "scale"; duration: 300; easing.type: Easing.OutBack }
+                            }
+                        }
+                    },
+                    Transition {
+                        from: "PEEK"; to: "COUNTDOWN"
+                        // 恢复时可以并行，稍微错开一点即可
+                        ParallelAnimation {
+                            NumberAnimation { target: peekState; property: "opacity"; duration: 200; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: countdownState; property: "opacity"; duration: 300; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: countdownState; property: "scale"; duration: 300; easing.type: Easing.OutBack }
+                        }
+                    }
+                ]
+                
                 // 1. 默认状态：倒计时 (Countdown State)
                 Item {
                     id: countdownState
                     anchors.fill: parent
                     
-                    // 当不在迷你模式下悬停时显示
-                    property bool active: !(isPinned && centerMouseArea.containsMouse)
-                    
-                    opacity: active ? 1.0 : 0.0
-                    scale: active ? 1.0 : 0.8 // 退出时缩小，营造空间纵深感
-                    
-                    Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                    Behavior on scale { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                    // 移除原来的属性绑定和 Behavior，交由父容器 State 管理
+                    opacity: 1.0 
+                    scale: 1.0
 
                     Column {
                         anchors.centerIn: parent
@@ -791,16 +828,11 @@ Window {
                     id: peekState
                     anchors.fill: parent
                     
-                    // 仅在迷你模式且悬停时显示
-                    property bool active: isPinned && centerMouseArea.containsMouse
-                    
-                    opacity: active ? 1.0 : 0.0
-                    scale: active ? 1.0 : 1.1 // 进入时从 1.1 缩小到 1.0，营造浮现聚焦感
+                    // 移除原来的属性绑定和 Behavior，交由父容器 State 管理
+                    opacity: 0.0
+                    scale: 1.1
                     visible: opacity > 0 // 优化性能
                     
-                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
-
                     Column {
                         anchors.centerIn: parent
                         spacing: 0 // 紧凑布局
@@ -831,13 +863,14 @@ Window {
                 }
             }
 
-            // 交互层：点击暂停/继续，双击切换模式，三击立即休息
+            // 交互层：点击暂停/继续，双击切换模式，三击立即休息，右击菜单
             MouseArea {
                 id: centerMouseArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true // 开启悬停以显示详细 ETA
-                
+                acceptedButtons: Qt.LeftButton | Qt.RightButton // 启用右键点击
+
                 // 支持拖拽窗口 (即使在圆环上也能拖拽)
                 property point clickPos
                 property bool isDrag: false
@@ -873,6 +906,11 @@ Window {
                 }
                 
                 onPressed: {
+                    // 右键点击直接打开菜单，不参与多击逻辑
+                    if (mouse.button === Qt.RightButton) {
+                        return
+                    }
+
                     clickPos = Qt.point(mouseX, mouseY)
                     isDrag = false
                     // lastPos 用于计算位移增量
@@ -903,6 +941,8 @@ Window {
                 
                 property point lastPos
                 onPositionChanged: {
+                    // 右键拖拽也支持移动窗口
+                    
                     // 更新交互点 (映射到窗口坐标)
                     var p = mapToItem(mainWindow.contentItem, mouseX, mouseY)
                     mainWindow.interactionPoint = p
@@ -923,6 +963,20 @@ Window {
                 }
                 
                 onClicked: {
+                    // 右键处理
+                    if (mouse.button === Qt.RightButton) {
+                        // 仅在迷你模式 (isPinned) 下显示右键菜单
+                        if (mainWindow.isPinned) {
+                            var globalPos = centerMouseArea.mapToGlobal(mouseX, mouseY)
+                            quickMenu.x = globalPos.x + 10
+                            quickMenu.y = globalPos.y + 10
+                            quickMenu.show()
+                            quickMenu.requestActivate() // 强制获取焦点，确保 onActiveChanged 能正常触发关闭
+                        }
+                        return
+                    }
+
+                    // 左键处理
                     // 只有在非拖拽且非三击序列中才触发暂停
                     // 如果 clickCount >= 3，说明是三击操作的一部分，不应触发单击逻辑
                     if (!isDrag && clickCount < 3) {
@@ -931,6 +985,9 @@ Window {
                 }
                 
                 onDoubleClicked: {
+                    // 仅响应左键双击
+                    if (mouse.button !== Qt.LeftButton) return
+
                     // 双击切换模式
                     // 增加条件：只有当点击计数小于3时才处理双击
                     // 避免四击操作中(第3、4次点击)触发第二次双击事件，导致误切换模式
@@ -950,6 +1007,186 @@ Window {
                     repeat: false
                     onTriggered: {
                         timerEngine.togglePause()
+                    }
+                }
+            }
+
+            // === 右键快捷菜单 (Glassmorphism Style - 独立窗口以突破父窗口边界) ===
+            Window {
+                id: quickMenu
+                width: 140
+                height: menuColumn.height + 16 // 增加内边距
+                flags: Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint
+                color: "transparent"
+                
+                // 失去焦点时自动关闭 (模拟 Popup 行为)
+                onActiveChanged: {
+                    if (!active) close()
+                }
+
+                // 菜单容器 (用于整体缩放动画)
+                Item {
+                    id: menuContainer
+                    anchors.fill: parent
+                    anchors.margins: 4 // 留出边缘给阴影或缩放空间
+                    scale: 1.0
+                    
+                    // 鼠标移入时的交互反馈
+                    MouseArea {
+                        id: hoverArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: menuAnim.start()
+                        onExited: menuAnimReverse.start()
+                    }
+
+                    // 缩放动画
+                    ParallelAnimation {
+                        id: menuAnim
+                        NumberAnimation { target: menuContainer; property: "scale"; to: 1.05; duration: 200; easing.type: Easing.OutBack }
+                    }
+                    ParallelAnimation {
+                        id: menuAnimReverse
+                        NumberAnimation { target: menuContainer; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutQuad }
+                    }
+
+                    Rectangle {
+                        id: menuBgRect
+                        anchors.fill: parent
+                        radius: 12
+                        // 动态边框颜色：默认微亮，悬停高亮
+                        border.color: hoverArea.containsMouse ? "#8000d2ff" : "#3300d2ff"
+                        border.width: 1
+                        
+                        // 背景渐变：从深蓝到更深蓝，但增加一点青色倾向，呼应悬浮球
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: "#F21A2838" } // 稍亮的蓝灰色
+                            GradientStop { position: 1.0; color: "#F20B121E" } // 深邃底色
+                        }
+                        
+                        // 模拟内部微光 (Top highlight)
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: "#40ffffff"
+                            anchors.top: parent.top
+                            anchors.topMargin: 1
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            opacity: 0.5
+                        }
+                    }
+                    
+                    Column {
+                        id: menuColumn
+                        width: parent.width
+                        anchors.centerIn: parent
+                        spacing: 4
+                        
+                        // 菜单项组件
+                        component MenuItemRow : Rectangle {
+                            id: menuItem
+                            width: parent.width - 16 // 左右留白
+                            height: 34
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            color: hoverArea.containsMouse ? "#2000d2ff" : "transparent" // 悬停使用青色微光
+                            radius: 8
+                            
+                            property string icon: ""
+                            property string label: ""
+                            property string shortcut: ""
+                            signal triggered()
+                            
+                            // 图标
+                            Text {
+                                id: iconText
+                                text: menuItem.icon
+                                color: hoverArea.containsMouse ? "#00d2ff" : "#AAB8C2" // 悬停变青色
+                                font.pixelSize: 15
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 20
+                                horizontalAlignment: Text.AlignHCenter
+                                scale: hoverArea.containsMouse ? 1.1 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 150 } }
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            
+                            // 标签
+                            Text {
+                                id: labelText
+                                text: menuItem.label
+                                color: hoverArea.containsMouse ? "#ffffff" : "#E1E8ED" // 默认更亮一点的灰
+                                font.pixelSize: 12
+                                font.family: "Microsoft YaHei UI"
+                                font.bold: hoverArea.containsMouse
+                                anchors.left: iconText.right
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            
+                            // 快捷键
+                            Text {
+                                text: menuItem.shortcut
+                                color: hoverArea.containsMouse ? "#00d2ff" : "#556677" // 悬停变青色
+                                font.pixelSize: 10
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                opacity: 0.8
+                            }
+                            
+                            MouseArea {
+                                id: hoverArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    menuItem.triggered()
+                                    quickMenu.close()
+                                }
+                            }
+                        }
+                        
+                        // 顶部间距
+                        Item { width: 1; height: 2 }
+
+                        MenuItemRow {
+                            icon: timerEngine.isRunning ? "⏸" : "▶"
+                            label: timerEngine.isRunning ? "暂停计时" : "继续计时"
+                            shortcut: "单击"
+                            onTriggered: timerEngine.togglePause()
+                        }
+                        
+                        MenuItemRow {
+                            icon: "⇋" 
+                            label: "切换模式"
+                            shortcut: "双击"
+                            onTriggered: mainWindow.isPinned = !mainWindow.isPinned
+                        }
+                        
+                        MenuItemRow {
+                            icon: "⚡"
+                            label: "立即运动"
+                            shortcut: "三击"
+                            onTriggered: {
+                                themeController.generateRandomTheme()
+                                isReminderActive = true
+                            }
+                        }
+                        
+                        MenuItemRow {
+                            icon: "☾"
+                            label: "午休助眠"
+                            shortcut: "四击"
+                            onTriggered: timerEngine.startNap()
+                        }
+                        
+                        // 底部间距
+                        Item { width: 1; height: 2 }
                     }
                 }
             }

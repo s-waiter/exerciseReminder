@@ -37,6 +37,7 @@ void TimerEngine::startNap() {
     // 如果正在计时，暂停它
     if (m_timer->isActive()) {
         m_timer->stop();
+        emit isRunningChanged();
     }
     
     m_isNapMode = true;
@@ -95,6 +96,10 @@ QString TimerEngine::estimatedFinishTime() const {
     return QDateTime::currentDateTime().addSecs(m_remainingSecs).toString("HH:mm");
 }
 
+bool TimerEngine::isRunning() const {
+    return m_timer->isActive();
+}
+
 // -------------------------------------------------------------------------
 // Setter / Slots 实现
 // -------------------------------------------------------------------------
@@ -140,6 +145,7 @@ void TimerEngine::startWork() {
     // 启动定时器 (如果还没启动)
     if (!m_timer->isActive()) {
         m_timer->start();
+        emit isRunningChanged();
     }
 }
 
@@ -155,13 +161,16 @@ void TimerEngine::snooze() {
     
     if (!m_timer->isActive()) {
         m_timer->start();
+        emit isRunningChanged();
     }
 }
 
 void TimerEngine::stop() {
+    bool wasRunning = m_timer->isActive();
     m_timer->stop(); // 停止硬件定时器
     m_status = "已暂停";
     emit statusChanged();
+    if (wasRunning) emit isRunningChanged();
 }
 
 // 智能暂停/恢复切换
@@ -176,6 +185,7 @@ void TimerEngine::togglePause() {
             m_status = "工作中";
             emit statusChanged();
             m_timer->start();
+            emit isRunningChanged();
         } else {
             // 如果是其他状态（如休息结束、准备就绪），则开启新一轮工作
             startWork();

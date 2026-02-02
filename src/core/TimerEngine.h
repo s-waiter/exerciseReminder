@@ -47,6 +47,9 @@ class TimerEngine : public QObject
     // 6. 是否处于午休模式 (新增)
     Q_PROPERTY(bool isNapMode READ isNapMode NOTIFY isNapModeChanged)
 
+    // 7. 是否正在运行 (新增，用于UI显示暂停/继续状态)
+    Q_PROPERTY(bool isRunning READ isRunning NOTIFY isRunningChanged)
+
 public:
     // 构造函数
     // parent: 父对象指针。Qt 使用对象树机制管理内存。
@@ -60,6 +63,7 @@ public:
     QString estimatedFinishTime() const;
     int currentSessionTotalTime() const;
     bool isNapMode() const;
+    bool isRunning() const;
 
 // ========================================================================
 // Slots (槽函数)
@@ -136,6 +140,9 @@ signals:
 
     // 午休模式改变信号
     void isNapModeChanged();
+
+    // 运行状态改变信号
+    void isRunningChanged();
 
 private slots:
     // 内部槽函数：处理 QTimer 的每秒超时事件
