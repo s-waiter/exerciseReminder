@@ -110,6 +110,10 @@ Window {
     // 这彻底避免了窗口先在屏幕中间闪烁一下再跳到右上角，或在错误位置显示的“视觉抖动”，实现“无感启动”。
     visible: isInitialized
     
+    // 新增标志：记录是否在进入 Mini 模式后鼠标已经移出过
+    // 用于解决双击切换时立即显示 Peek 状态导致的卡影/突兀问题
+    property bool hasMouseExitedSinceMiniMode: false
+    
     title: "DeskCare"
     color: "transparent" // 窗口背景完全透明，由内部 Rectangle 绘制实际背景
     
@@ -167,6 +171,12 @@ Window {
     // 模式切换与视觉补偿
     // ========================================================================
     onIsPinnedChanged: {
+        // 重置鼠标移出标志
+        // 智能逻辑：
+        // 1. 如果鼠标当前就在区域内（例如双击切换），则设为 false，强制用户先移出（防 Ghosting）。
+        // 2. 如果鼠标在区域外（例如自动启动或远程切换），则设为 true，确保用户首次移入即可看到 Peek。
+        hasMouseExitedSinceMiniMode = !centerMouseArea.containsMouse
+        
         // 调用 C++ 工具类设置窗口置顶
         windowUtils.setTopMost(mainWindow, isPinned)
         
@@ -715,7 +725,9 @@ Window {
                 height: parent.height
                 
                 // 使用 State 和 Transition 明确管理状态切换，避免视觉重叠
-                state: (isPinned && centerMouseArea.containsMouse) ? "PEEK" : "COUNTDOWN"
+                // 逻辑升级：增加 hasMouseExitedSinceMiniMode 条件
+                // 只有当：是 Mini 模式 AND 鼠标悬停 AND 鼠标已经移出过一次 后，才显示 PEEK
+                state: (isPinned && centerMouseArea.containsMouse && hasMouseExitedSinceMiniMode) ? "PEEK" : "COUNTDOWN"
 
                 states: [
                     State {
@@ -733,25 +745,35 @@ Window {
                 transitions: [
                     Transition {
                         from: "COUNTDOWN"; to: "PEEK"
-                        // 关键修复：串行执行动画。先隐藏倒计时，再显示 Peek，彻底杜绝重叠 ghosting
+                        // 修复：严格串行执行。先完全隐藏倒计时，再显示 Peek，彻底杜绝重叠 Ghosting。
+                        // 之前的并行/交错方案在半透明阶段会导致视觉上的文字叠加，用户体验不佳。
                         SequentialAnimation {
+                            // 1. 退出者：迅速淡出 (150ms)
                             ParallelAnimation {
-                                NumberAnimation { target: countdownState; property: "opacity"; duration: 150; easing.type: Easing.OutQuad }
-                                NumberAnimation { target: countdownState; property: "scale"; duration: 150; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: countdownState; property: "opacity"; to: 0.0; duration: 150; easing.type: Easing.InQuad }
+                                NumberAnimation { target: countdownState; property: "scale"; to: 0.9; duration: 150; easing.type: Easing.InQuad }
                             }
+                            
+                            // 2. 进入者：迅速淡入 (200ms)
+                            // 此时 countdownState 已经完全透明，不会有任何重叠
                             ParallelAnimation {
-                                NumberAnimation { target: peekState; property: "opacity"; duration: 300; easing.type: Easing.OutCubic }
-                                NumberAnimation { target: peekState; property: "scale"; duration: 300; easing.type: Easing.OutBack }
+                                NumberAnimation { target: peekState; property: "opacity"; to: 1.0; duration: 200; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: peekState; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutBack }
                             }
                         }
                     },
                     Transition {
                         from: "PEEK"; to: "COUNTDOWN"
-                        // 恢复时可以并行，稍微错开一点即可
-                        ParallelAnimation {
-                            NumberAnimation { target: peekState; property: "opacity"; duration: 200; easing.type: Easing.OutQuad }
-                            NumberAnimation { target: countdownState; property: "opacity"; duration: 300; easing.type: Easing.OutCubic }
-                            NumberAnimation { target: countdownState; property: "scale"; duration: 300; easing.type: Easing.OutBack }
+                        // 恢复时同样严格串行
+                        SequentialAnimation {
+                            // 1. 退出者
+                            NumberAnimation { target: peekState; property: "opacity"; to: 0.0; duration: 150; easing.type: Easing.InQuad }
+                            
+                            // 2. 进入者
+                            ParallelAnimation {
+                                NumberAnimation { target: countdownState; property: "opacity"; to: 1.0; duration: 200; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: countdownState; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutBack }
+                            }
                         }
                     }
                 ]
@@ -870,6 +892,13 @@ Window {
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true // 开启悬停以显示详细 ETA
                 acceptedButtons: Qt.LeftButton | Qt.RightButton // 启用右键点击
+
+                // 监听鼠标移出事件，更新标志位
+                onExited: {
+                    if (mainWindow.isPinned) {
+                        mainWindow.hasMouseExitedSinceMiniMode = true
+                    }
+                }
 
                 // 支持拖拽窗口 (即使在圆环上也能拖拽)
                 property point clickPos
