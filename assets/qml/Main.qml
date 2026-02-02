@@ -286,25 +286,28 @@ Window {
         id: bgContainer
         anchors.fill: parent
         
-        // 使用 OpacityMask 实现完美的圆角裁剪
-        // 这是 QtGraphicalEffects 的功能，比简单的 Rectangle.radius 效果更好，且支持子项裁剪。
+        // 视觉优先：恢复 OpacityMask 以实现完美的圆形裁剪
+        // 尽管 clip: true 性能更好，但无法在圆形 radius 下完美工作（会有矩形边界）。
+        // 用户明确要求优先保证视觉体验。
         layer.enabled: true
         layer.effect: OpacityMask {
             maskSource: Rectangle {
-                width: bgContainer.width
-                height: bgContainer.height
-                // 迷你模式下变成圆形 (width/2)，正常模式下是大圆角 (20)
-                radius: isPinned ? width / 2 : 20
-                Behavior on radius { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                visible: false
+                width: bgRect.width
+                height: bgRect.height
+                radius: bgRect.radius
+                visible: false // 遮罩本身不需要显示
             }
         }
 
         Rectangle {
             id: bgRect
             anchors.fill: parent
-            // radius: isPinned ? width / 2 : 20 // 移除 radius 和 clip，由 OpacityMask 接管
-            // clip: true
+            radius: isPinned ? width / 2 : 20
+            // 移除 clip: true，因为它会切出矩形边界，导致圆形背景出现方形轮廓
+            // clip: true 
+
+            
+            Behavior on radius { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
             
             // 高科技感渐变背景
             gradient: Gradient {
@@ -340,7 +343,9 @@ Window {
                 
                 // 呼吸动画：透明度在 0.05 到 0.15 之间循环
                 SequentialAnimation on opacity {
-                    running: timerEngine.statusText === "工作中"
+                    // 性能优化：增加 mainWindow.visible 检查
+                    // 只有当窗口可见且处于工作中状态时才运行动画，防止后台空耗 CPU
+                    running: mainWindow.visible && timerEngine.statusText === "工作中"
                     loops: Animation.Infinite
                     NumberAnimation { from: 0.05; to: 0.15; duration: 2000; easing.type: Easing.InOutQuad }
                     NumberAnimation { from: 0.15; to: 0.05; duration: 2000; easing.type: Easing.InOutQuad }
@@ -443,8 +448,8 @@ Window {
         ParticleSystem {
             id: emotionParticles
             anchors.fill: parent
-            // 始终运行，不受暂停状态影响
-            running: true
+            // 性能优化：仅在窗口可见时运行，避免后台消耗资源
+            running: mainWindow.visible
             
             // 始终保持平静的科技蓝/青色调，或者跟随主题色
             property color particleColor: mainWindow.themeColor
@@ -462,20 +467,21 @@ Window {
             }
 
             // 发射器
-            Emitter {
-                anchors.fill: parent
-                // 恒定低发射率，营造稀疏、空灵感
-                emitRate: 8 
-                lifeSpan: 4000 // 延长生命周期，让粒子飘得更久
-                size: 4
-                sizeVariation: 2
-                
-                velocity: AngleDirection {
-                    angleVariation: 360
-                    // 恒定低速，如水中浮游生物般缓慢
-                    magnitude: 20 
-                    magnitudeVariation: 10
-                }
+                    Emitter {
+                        anchors.fill: parent
+                        // 视觉优先：恢复原始高规格参数 (emitRate: 8, lifeSpan: 4000)
+                        // 保证前台视觉的丰富度，后台性能由 running 属性守卫
+                        emitRate: 8 
+                        lifeSpan: 4000 
+                        size: 4
+                        sizeVariation: 2
+                        
+                        velocity: AngleDirection {
+                            angleVariation: 360
+                            // 恒定低速，如水中浮游生物般缓慢
+                            magnitude: 20 
+                            magnitudeVariation: 10
+                        }
             }
             
             // 扰动场：轻微的气流感
@@ -555,7 +561,8 @@ Window {
                 
                 // 呼吸动画
                 SequentialAnimation on opacity {
-                    running: breathingGlow.visible
+                    // 性能优化：增加 mainWindow.visible 检查
+                    running: mainWindow.visible && breathingGlow.visible
                     loops: Animation.Infinite
                     PropertyAnimation { to: 0.5; duration: 2000; easing.type: Easing.InOutSine }
                     PropertyAnimation { to: 0.2; duration: 2000; easing.type: Easing.InOutSine }
@@ -601,8 +608,17 @@ Window {
                 }
                 
                 // 当 progress 或 drawColor 变化时，请求重新绘制
-                onProgressChanged: requestPaint()
-                onDrawColorChanged: requestPaint()
+                // 性能优化：仅当窗口可见时才请求重绘
+                onProgressChanged: if (mainWindow.visible) requestPaint()
+                onDrawColorChanged: if (mainWindow.visible) requestPaint()
+                
+                // 当窗口重新显示时，立即刷新一次以更新进度
+                Connections {
+                    target: mainWindow
+                    function onVisibleChanged() {
+                        if (mainWindow.visible) progressCanvas.requestPaint()
+                    }
+                }
 
                 onPaint: {
                     var ctx = getContext("2d");
@@ -706,9 +722,11 @@ Window {
                         cornerRadius: 12 // 匹配 glowRadius 确保圆形光晕
                         opacity: 0.9 // 保持高透明度，增强光的通透感
                         
-                        // 动态呼吸：模拟脉冲能量
+                        // 恢复动态呼吸：模拟脉冲能量
+                        // 尽管消耗 CPU，但为了极致的视觉体验，我们保留这个细节
+                        // 仅在窗口可见时运行以节省不必要的开销
                         SequentialAnimation on glowRadius {
-                            running: rimLightContainer.visible
+                            running: mainWindow.visible && rimLightContainer.visible
                             loops: Animation.Infinite
                             PropertyAnimation { to: 15; duration: 1000; easing.type: Easing.InOutSine }
                             PropertyAnimation { to: 12; duration: 1000; easing.type: Easing.InOutSine }

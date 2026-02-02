@@ -296,6 +296,7 @@ Window {
                         border.color: Qt.rgba(currentTheme.gradientEnd.r, currentTheme.gradientEnd.g, currentTheme.gradientEnd.b, 0.3)
                         
                         RotationAnimation on rotation {
+                            running: overlayWin.visible
                             loops: Animation.Infinite
                             from: 0; to: 360; duration: 10000
                         }
