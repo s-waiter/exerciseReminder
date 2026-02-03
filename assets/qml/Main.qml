@@ -102,13 +102,64 @@ Window {
     // Normal (正常模式): 280x420 (恢复到用户觉得舒适的尺寸)
     width: isPinned ? 120 : 280
     height: isPinned ? 120 : 420
+
+    // Loader for Activity Dashboard
+    Loader {
+        id: dashboardLoader
+        active: false
+        source: "ActivityDashboard.qml"
+        onLoaded: {
+            item.visible = true
+            // Bind theme color for consistency
+            item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
+            item.closing.connect(function() {
+                dashboardLoader.active = false
+                // Restore main window position and visibility
+                mainWindow.x = savedX
+                mainWindow.y = savedY
+                mainWindow.visible = true
+                mainWindow.opacity = 1
+                mainWindow.requestActivate()
+                // Re-enable animation after restoration
+                enableAnimationTimer.restart()
+            })
+        }
+    }
+    
+    function showDashboard() {
+        // Save position and move off-screen to prevent ghosting
+        savedX = x
+        savedY = y
+        animationEnabled = false // Disable animation for instant move
+        mainWindow.x = -10000
+        mainWindow.opacity = 0
+        mainWindow.visible = false
+        
+        // Delay opening dashboard
+        openDashboardTimer.restart()
+    }
+
+    Timer {
+        id: openDashboardTimer
+        interval: 150
+        repeat: false
+        onTriggered: dashboardLoader.active = true
+    }
+
+    Timer {
+        id: enableAnimationTimer
+        interval: 500
+        repeat: false
+        onTriggered: animationEnabled = true
+    }
     
     // 完美启动逻辑：
     // 1. 默认 visible 为 false (由 isInitialized 控制)，确保窗口在定位完成前不可见
     // 2. Component.onCompleted 中根据启动模式计算位置
     // 3. 定位完成后设置 isInitialized = true，窗口平滑显示
     // 这彻底避免了窗口先在屏幕中间闪烁一下再跳到右上角，或在错误位置显示的“视觉抖动”，实现“无感启动”。
-    visible: isInitialized
+    visible: false // Manual control
+    onIsInitializedChanged: if (isInitialized) visible = true
     
     // 新增标志：记录是否在进入 Mini 模式后鼠标已经移出过
     // 用于解决双击切换时立即显示 Peek 状态导致的卡影/突兀问题
@@ -123,6 +174,8 @@ Window {
     // Qt.FramelessWindowHint: 去除操作系统的标题栏和边框，完全自定义 UI。
     // Qt.Window: 这是一个顶级窗口。
     property bool isPinned: false
+    property int savedX: 0
+    property int savedY: 0
     // 交互点坐标，用于粒子吸引效果
     property point interactionPoint: Qt.point(width/2, height/2)
     flags: Qt.FramelessWindowHint | Qt.Window
@@ -1741,6 +1794,10 @@ Window {
                 onReminderFinished: {
                     isReminderActive = false
                     // 自动开启下一轮工作倒计时
+                    timerEngine.startWork()
+                }
+                onRequestStartWork: {
+                    // 立即开始工作，无需等待 OverlayWindow 销毁 (OverlayWindow 会在自己的倒计时结束后通过 onReminderFinished 关闭)
                     timerEngine.startWork()
                 }
                 onSnoozeRequested: {

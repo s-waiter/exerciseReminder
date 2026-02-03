@@ -31,6 +31,18 @@ TimerEngine::TimerEngine(QObject *parent)
     startWork(); 
 }
 
+TimerEngine::ActivityState TimerEngine::currentActivityState() const {
+    return m_activityState;
+}
+
+void TimerEngine::setActivityState(TimerEngine::ActivityState state) {
+    if (m_activityState != state) {
+        m_activityState = state;
+        emit activityStateChanged(state);
+        qDebug() << "Activity State Changed to:" << state;
+    }
+}
+
 void TimerEngine::startNap() {
     if (m_isNapMode) return;
     
@@ -48,6 +60,8 @@ void TimerEngine::startNap() {
     emit statusChanged();
     emit isNapModeChanged();
     
+    setActivityState(State_Nap);
+
     qDebug() << "Nap started at" << m_napStartTime;
 }
 
@@ -142,6 +156,8 @@ void TimerEngine::startWork() {
     emit statusChanged();
     emit timeUpdated();
     
+    setActivityState(State_Focus);
+
     // 启动定时器 (如果还没启动)
     if (!m_timer->isActive()) {
         m_timer->start();
@@ -159,6 +175,8 @@ void TimerEngine::snooze() {
     emit statusChanged();
     emit timeUpdated();
     
+    setActivityState(State_Focus); // 贪睡本质上还是在倒计时（工作/拖延状态）
+
     if (!m_timer->isActive()) {
         m_timer->start();
         emit isRunningChanged();
@@ -171,6 +189,9 @@ void TimerEngine::stop() {
     m_status = "已暂停";
     emit statusChanged();
     if (wasRunning) emit isRunningChanged();
+    
+    m_pausedBySystem = false;
+    setActivityState(State_Pause);
 }
 
 // 智能暂停/恢复切换
@@ -186,6 +207,7 @@ void TimerEngine::togglePause() {
             emit statusChanged();
             m_timer->start();
             emit isRunningChanged();
+            setActivityState(State_Focus);
         } else {
             // 如果是其他状态（如休息结束、准备就绪），则开启新一轮工作
             startWork();
@@ -227,6 +249,9 @@ void TimerEngine::recordExercise(int durationSeconds) {
     settings.sync();
     
     qDebug() << "Recorded exercise:" << durationSeconds << "s. Today total:" << (current + durationSeconds);
+
+    // 发出信号通知 ActivityLogger 同步记录
+    emit exerciseRecorded(durationSeconds);
 }
 
 int TimerEngine::getTodayExerciseSeconds() {
@@ -276,6 +301,7 @@ void TimerEngine::handleSystemLock(bool locked) {
             m_pausedBySystem = true;
             qDebug() << "System locked: Timer paused automatically.";
             // 这里不改变 m_status，让用户感觉只是时间冻结了
+            setActivityState(State_Pause);
         }
     } else {
         // 系统解锁
@@ -284,6 +310,7 @@ void TimerEngine::handleSystemLock(bool locked) {
             m_timer->start();
             m_pausedBySystem = false;
             qDebug() << "System unlocked: Timer resumed automatically.";
+            setActivityState(State_Focus);
         }
     }
 }
@@ -306,5 +333,7 @@ void TimerEngine::onTick() {
         
         // 触发核心提醒信号 -> 将导致全屏窗口弹出
         emit reminderTriggered();
+        
+        setActivityState(State_Rest);
     }
 }

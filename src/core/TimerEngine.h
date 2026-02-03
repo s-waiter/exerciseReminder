@@ -18,6 +18,18 @@ class TimerEngine : public QObject
     // 编译时，MOC (Meta-Object Compiler) 会扫描此宏并生成额外的 C++ 代码 (moc_TimerEngine.cpp)。
     Q_OBJECT
 
+public:
+    // 活动状态枚举
+    enum ActivityState {
+        State_Focus = 0,    // 专注工作
+        State_Rest,         // 运动休息
+        State_Nap,          // 午休
+        State_Pause,        // 暂停
+        State_Offline,      // 离线/未知
+        State_Ready         // 准备就绪/空闲
+    };
+    Q_ENUM(ActivityState)
+
     // ========================================================================
     // Q_PROPERTY 属性系统
     // ========================================================================
@@ -26,6 +38,9 @@ class TimerEngine : public QObject
     // - READ: QML 读取属性时调用的 C++ 函数。
     // - WRITE: QML 修改属性时调用的 C++ 函数 (可选，只读属性不需要)。
     // - NOTIFY: 当属性值发生变化时，C++ 发出的信号。QML 依靠这个信号自动更新界面 (数据绑定)。
+
+    // 0. 当前活动状态 (新增)
+    Q_PROPERTY(ActivityState currentActivityState READ currentActivityState NOTIFY activityStateChanged)
 
     // 1. 剩余秒数 (只读)
     Q_PROPERTY(int remainingSeconds READ remainingSeconds NOTIFY timeUpdated)
@@ -57,6 +72,7 @@ public:
     explicit TimerEngine(QObject *parent = nullptr);
 
     // Getter 函数 (对应 Q_PROPERTY 的 READ)
+    ActivityState currentActivityState() const;
     int remainingSeconds() const;
     QString statusText() const;
     int workDurationMinutes() const;
@@ -138,11 +154,17 @@ signals:
     // 休息结束信号，带有时长（秒），用于统计或日志
     void breakFinished(int durationSeconds);
 
+    // 数据同步信号 (当 recordExercise 被调用时触发)
+    void exerciseRecorded(int durationSeconds);
+
     // 午休模式改变信号
     void isNapModeChanged();
 
     // 运行状态改变信号
     void isRunningChanged();
+
+    // 状态变更信号
+    void activityStateChanged(ActivityState newState);
 
 private slots:
     // 内部槽函数：处理 QTimer 的每秒超时事件
@@ -162,4 +184,7 @@ private:
     bool m_pausedBySystem = false; // 标记是否因系统锁屏而暂停
     bool m_isNapMode = false; // 午休模式状态
     QDateTime m_napStartTime; // 记录午休开始时间 (用于统计午休时长)
+
+    ActivityState m_activityState = State_Ready;
+    void setActivityState(ActivityState state);
 };

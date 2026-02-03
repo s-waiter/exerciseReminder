@@ -5,6 +5,7 @@
         <file>assets/qml/NapWindow.qml</file>
         <file>assets/qml/ThemeController.qml</file>
         <file>assets/qml/SettingsOverlay.qml</file>
+        <file>assets/qml/ActivityDashboard.qml</file>
         <file>assets/qml/UpdateDialog.qml</file>
         <file>assets/images/tray_icon.svg</file>
     </qresource>

@@ -1,4 +1,5 @@
-QT += core gui qml quick widgets svg network
+QT += core gui qml quick widgets svg network sql
+
 CONFIG += c++17
 
 TARGET = DeskCare
@@ -12,7 +13,8 @@ SOURCES += \
     src/utils/WindowUtils.cpp \
     src/core/UpdateManager.cpp \
     src/core/StatisticsManager.cpp \
-    src/core/Version.cpp
+    src/core/Version.cpp \
+    src/core/ActivityLogger.cpp
 
 HEADERS += \
     src/core/TimerEngine.h \
@@ -21,7 +23,8 @@ HEADERS += \
     src/utils/WindowUtils.h \
     src/core/UpdateManager.h \
     src/core/StatisticsManager.h \
-    src/core/Version.h
+    src/core/Version.h \
+    src/core/ActivityLogger.h
 
 RESOURCES += resources.qrc
 

@@ -38,6 +38,7 @@ Window {
     property var themeData: ({})
     
     // 信号 (Signals)：用于通知 C++ 后端
+    signal requestStartWork() // 请求立即开始工作（跳过倒计时）
     signal reminderFinished() // 提醒流程结束（用户点击完成或超时）
     signal snoozeRequested()  // 用户请求贪睡（暂未实现）
 
@@ -147,6 +148,14 @@ Window {
         color: "transparent"
         visible: overlayWin.feedbackText !== "" // 只有有反馈文本时才显示
         z: 1001 // 确保最顶层 (高于 mouseTracker z:1000)
+
+        // 拦截所有点击事件，防止误触底层的按钮 (如再次点击完成导致重复记录)
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            // 不做任何处理，仅仅是吞掉事件
+        }
 
         // 1. 背景模糊与变暗 (沉浸式呼吸 + 视差)
         Rectangle {
@@ -644,7 +653,10 @@ Window {
                                 running: feedbackLayer.visible
                                 paused: feedbackMouseArea.containsMouse // 悬停暂停
                                 from: 0; to: 3000; duration: 3000
-                                onFinished: overlayWin.reminderFinished() // 动画结束触发关闭
+                                onFinished: {
+                                    // 倒计时结束，不再记录额外时间为运动，而是作为暂停时间（通过 TimerEngine 状态切换实现）
+                                    overlayWin.reminderFinished() // 动画结束触发关闭
+                                }
                             }
                         }
                     }
@@ -1204,22 +1216,26 @@ Window {
             }
             
             onClicked: {
-                // 1. 强制运动拦截逻辑 (双重保险，虽然 UI 上已经提示了)
-                if (overlayWin.isForcedLocked) {
-                    var msg = "加油！还需坚持 " + overlayWin.remainingForcedSeconds + " 秒才能完成哦"
-                    showToast(msg)
-                    return
-                }
+                    // 1. 强制运动拦截逻辑 (双重保险，虽然 UI 上已经提示了)
+                    if (overlayWin.isForcedLocked) {
+                        var msg = "加油！还需坚持 " + overlayWin.remainingForcedSeconds + " 秒才能完成哦"
+                        showToast(msg)
+                        return
+                    }
 
-                // 2. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
-                var now = new Date()
-                var durationSeconds = 0
+                    // 2. 计算时长 (前端计算，不依赖后端信号，确保响应速度)
+                    var now = new Date()
+                    var durationSeconds = 0
                 if(overlayWin.showTime) {
                     durationSeconds = Math.floor((now - overlayWin.showTime) / 1000)
                 }
                 
                 // 2. 记录数据到后端并获取最新统计
                 timerEngine.recordExercise(durationSeconds)
+                // 关键修改：点击完成运动后，立即将状态切换为“暂停”。
+                // 这样从此刻开始，直到图表展示结束（调用 startWork），这段时间会被 ActivityLogger 记录为 Pause 状态。
+                timerEngine.stop()
+
                 overlayWin.todayTotalSeconds = timerEngine.getTodayExerciseSeconds()
                 overlayWin.weeklyStats = timerEngine.getWeeklyExerciseStats()
                 overlayWin.todaySessions = timerEngine.getTodaySessions() // 获取最新会话列表
@@ -1239,7 +1255,7 @@ Window {
                 overlayWin.sessionTimeRange = startStr + " - " + endStr
                 
                 // 4. 显示反馈并准备关闭
-                // closeTimer.restart() // 已移除，通过 feedbackLayer 可见性自动触发倒计时
+                // 倒计时动画 (countdownAnim) 会自动运行并在结束后触发关闭
             }
         }
         
