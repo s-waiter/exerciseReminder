@@ -16,6 +16,12 @@ public:
     // QML Invokable methods
     Q_INVOKABLE QVariantList getDailyActivities(const QDate& date);
     Q_INVOKABLE QVariantMap getDailyStats(const QDate& date);
+    Q_INVOKABLE bool updateActivityContent(int id, const QString& content, int workType);
+    
+    // Report Generation
+    // range: 0=Day, 1=Week, 2=Month
+    // mode: 0=Full(Self), 1=Formal(Leader)
+    Q_INVOKABLE QString generateReport(const QDate& date, int range, int mode);
 
 private slots:
     void onActivityStateChanged(TimerEngine::ActivityState newState);

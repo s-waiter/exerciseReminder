@@ -64,6 +64,14 @@ void ActivityLogger::initDatabase() {
         qCritical() << "Error creating table:" << query.lastError();
     } else {
         m_dbInitialized = true;
+        
+        // Check and add new columns if they don't exist (Migration)
+        // content TEXT, work_type INTEGER
+        // SQLite doesn't support IF NOT EXISTS for ADD COLUMN, so we just try and ignore error
+        // or check pragma, but try-catch is simpler here since we just want to ensure they exist.
+        
+        query.exec("ALTER TABLE activity_log ADD COLUMN content TEXT");
+        query.exec("ALTER TABLE activity_log ADD COLUMN work_type INTEGER DEFAULT 0");
     }
 }
 
@@ -202,22 +210,28 @@ QVariantList ActivityLogger::getDailyActivities(const QDate& date) {
     qint64 endTs = dayEnd.toSecsSinceEpoch();
 
     QSqlQuery query;
-    query.prepare("SELECT state, start_time, end_time, duration FROM activity_log WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC");
+    query.prepare("SELECT id, state, start_time, end_time, duration, content, work_type FROM activity_log WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC");
     query.addBindValue(startTs);
     query.addBindValue(endTs);
 
     if (query.exec()) {
         while (query.next()) {
             QVariantMap map;
-            QString stateStr = query.value(0).toString();
-            qint64 sTime = query.value(1).toLongLong();
-            qint64 eTime = query.value(2).toLongLong();
-            int duration = query.value(3).toInt();
+            int id = query.value(0).toInt();
+            QString stateStr = query.value(1).toString();
+            qint64 sTime = query.value(2).toLongLong();
+            qint64 eTime = query.value(3).toLongLong();
+            int duration = query.value(4).toInt();
+            QString content = query.value(5).toString();
+            int workType = query.value(6).toInt();
 
+            map["id"] = id;
             map["state"] = stateStr;
             map["startTime"] = sTime * 1000; // JS uses milliseconds
             map["endTime"] = eTime * 1000;
             map["duration"] = duration;
+            map["content"] = content;
+            map["workType"] = workType;
             
             // Map state string back to a display friendly name or type
             if (stateStr == "Focus") map["type"] = 0; // Blue
@@ -375,4 +389,142 @@ QVariantMap ActivityLogger::getDailyStats(const QDate& date) {
     stats["maxNapStart"] = maxNapStart;
     
     return stats;
+}
+
+bool ActivityLogger::updateActivityContent(int id, const QString& content, int workType) {
+    if (!m_dbInitialized) return false;
+
+    QSqlQuery query;
+    query.prepare("UPDATE activity_log SET content = ?, work_type = ? WHERE id = ?");
+    query.addBindValue(content);
+    query.addBindValue(workType);
+    query.addBindValue(id);
+
+    if (query.exec()) {
+        qDebug() << "Updated activity content for ID:" << id;
+        return true;
+    } else {
+        qWarning() << "Failed to update activity content:" << query.lastError();
+        return false;
+    }
+}
+
+QString ActivityLogger::generateReport(const QDate& date, int range, int mode) {
+    if (!m_dbInitialized) return "Error: Database not initialized.";
+
+    QDateTime startDt, endDt;
+    endDt = QDateTime(date, QTime(23, 59, 59));
+
+    if (range == 0) { // Day
+        startDt = QDateTime(date, QTime(0, 0, 0));
+    } else if (range == 1) { // Week (Mon - Today)
+        // Find Monday
+        QDate d = date;
+        while (d.dayOfWeek() != 1) d = d.addDays(-1);
+        startDt = QDateTime(d, QTime(0, 0, 0));
+    } else if (range == 2) { // Month (1st - Today)
+        startDt = QDateTime(QDate(date.year(), date.month(), 1), QTime(0, 0, 0));
+    }
+
+    qint64 startTs = startDt.toSecsSinceEpoch();
+    qint64 endTs = endDt.toSecsSinceEpoch();
+
+    QSqlQuery query;
+    // We only care about Focus Work (state='Focus') that has content
+    QString sql = "SELECT start_time, end_time, duration, content, work_type FROM activity_log WHERE state='Focus' AND start_time >= ? AND start_time <= ? AND content IS NOT NULL AND content != '' ORDER BY start_time ASC";
+    query.prepare(sql);
+    query.addBindValue(startTs);
+    query.addBindValue(endTs);
+
+    if (!query.exec()) return "Error: Query failed " + query.lastError().text();
+
+    QString report;
+    report += "📅 工作汇报\n";
+    report += "时间范围: " + startDt.toString("MM-dd") + " 至 " + endDt.toString("MM-dd") + "\n";
+    if (mode == 0) report += "模式: 全景复盘 (个人)\n";
+    else report += "模式: 职场汇报 (正式)\n";
+    report += "----------------------------------------\n";
+
+    int count = 0;
+    while (query.next()) {
+        qint64 sTime = query.value(0).toLongLong();
+        qint64 eTime = query.value(1).toLongLong();
+        int duration = query.value(2).toInt();
+        QString content = query.value(3).toString();
+        int workType = query.value(4).toInt();
+
+        QDateTime sDt = QDateTime::fromSecsSinceEpoch(sTime);
+        QDateTime eDt = QDateTime::fromSecsSinceEpoch(eTime);
+        QString timeStr = QString("[%1 %2-%3] (%4m)")
+            .arg(sDt.toString("MM-dd"))
+            .arg(sDt.toString("HH:mm"))
+            .arg(eDt.toString("HH:mm"))
+            .arg(duration / 60);
+
+        // Parse JSON content if it starts with {
+        // Expected format: {"formal":"...", "learning":"...", "personal":"..."}
+        QString formal, learning, personal;
+        bool isJson = content.trimmed().startsWith("{");
+        
+        if (isJson) {
+            // "formal":"..."
+            int fStart = content.indexOf("\"formal\":\"");
+            if (fStart != -1) {
+                fStart += 10;
+                int fEnd = content.indexOf("\"", fStart);
+                if (fEnd != -1) formal = content.mid(fStart, fEnd - fStart);
+            }
+            
+            int lStart = content.indexOf("\"learning\":\"");
+            if (lStart != -1) {
+                lStart += 12;
+                int lEnd = content.indexOf("\"", lStart);
+                if (lEnd != -1) learning = content.mid(lStart, lEnd - lStart);
+            }
+            
+            int pStart = content.indexOf("\"personal\":\"");
+            if (pStart != -1) {
+                pStart += 12;
+                int pEnd = content.indexOf("\"", pStart);
+                if (pEnd != -1) personal = content.mid(pStart, pEnd - pStart);
+            }
+            
+            // Unescape (basic)
+            formal.replace("\\n", "\n");
+            learning.replace("\\n", "\n");
+            personal.replace("\\n", "\n");
+        } else {
+            // Legacy fallback: use workType to determine category
+            // 0: Formal, 1: Learning, 2: Personal
+            if (workType == 1) learning = content;
+            else if (workType == 2) personal = content;
+            else formal = content; // Default to formal (0 or others)
+        }
+
+        bool hasOutput = false;
+
+        // Formal Work
+        if (!formal.isEmpty()) {
+            report += QString("%1 %2 %3\n").arg(mode == 0 ? "🔵" : "•").arg(timeStr).arg(formal);
+            hasOutput = true;
+        }
+
+        // Learning (Skip in Leader Mode)
+        if (mode == 0 && !learning.isEmpty()) {
+            report += QString("🟢 %1 %2\n").arg(timeStr).arg(learning);
+            hasOutput = true;
+        }
+
+        // Personal (Skip in Leader Mode)
+        if (mode == 0 && !personal.isEmpty()) {
+            report += QString("🟡 %1 %2\n").arg(timeStr).arg(personal);
+            hasOutput = true;
+        }
+        
+        if (hasOutput) count++;
+    }
+
+    if (count == 0) report += "（无记录）\n";
+    
+    return report;
 }

@@ -156,6 +156,31 @@ Window {
 
                 Item { width: 20 }
 
+                // 报表生成按钮
+                Button {
+                    text: "📝 生成报表"
+                    flat: true
+                    contentItem: Text {
+                        text: parent.text
+                        color: parent.hovered ? "white" : "#CCCCCC"
+                        font.pixelSize: 14
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    background: Rectangle {
+                        color: parent.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+                        radius: 4
+                        border.color: Qt.rgba(1, 1, 1, 0.2)
+                        border.width: 1
+                    }
+                    onClicked: {
+                        reportGeneratorDialog.open()
+                    }
+                }
+
+                Item { width: 10 }
+
                 // 关闭按钮
                 Rectangle {
                     width: 32
@@ -304,6 +329,45 @@ Window {
                         // Zoom State
                         property double viewStartHour: 0.0
                         property double viewEndHour: 24.0
+
+                        function getVisualHoveredActivity(mx) {
+                            var data = timelineCanvas.activityData;
+                            if (!data) return null;
+
+                            var w = width;
+                            var viewStartSec = timelineCanvas.viewStartHour * 3600;
+                            var viewEndSec = timelineCanvas.viewEndHour * 3600;
+                            var viewDurationSec = viewEndSec - viewStartSec;
+                            
+                            var midnight = new Date(currentDate);
+                            midnight.setHours(0,0,0,0);
+                            var midnightTs = midnight.getTime();
+
+                            for (var k = 0; k < data.length; k++) {
+                                var act = data[k];
+                                var actStartSec = (act.startTime - midnightTs) / 1000;
+                                var actEndSec = (act.endTime - midnightTs) / 1000;
+
+                                // Visibility check
+                                if (actEndSec < viewStartSec || actStartSec > viewEndSec) continue;
+
+                                // Calculate visual geometry
+                                var visibleStart = Math.max(actStartSec, viewStartSec);
+                                var visibleEnd = Math.min(actEndSec, viewEndSec);
+                                
+                                var x = ((visibleStart - viewStartSec) / viewDurationSec) * w;
+                                var bw = ((visibleEnd - visibleStart) / viewDurationSec) * w;
+                                
+                                // Ensure minimum visibility for short durations
+                                if (bw < 2) bw = 2;
+
+                                // Hit detection
+                                if (mx >= x && mx <= x + bw) {
+                                    return act;
+                                }
+                            }
+                            return null;
+                        }
 
                         onPaint: {
                             var ctx = getContext("2d");
@@ -546,9 +610,26 @@ Window {
                             }
 
                             onDoubleClicked: {
-                                timelineCanvas.viewStartHour = 0;
-                                timelineCanvas.viewEndHour = 24;
-                                timelineCanvas.requestPaint();
+                                var act = timelineCanvas.getVisualHoveredActivity(mouseX);
+                                
+                                // New Logic: If clicking on Focus Work (Blue, type 0), open log dialog
+                                if (act && act.type === 0) {
+                                    // Use defaults if undefined
+                                    var content = act.content || ""
+                                    var type = act.workType !== undefined ? act.workType : 0
+                                    
+                                    // Format time range string
+                                    var st = new Date(act.startTime);
+                                    var et = new Date(act.endTime);
+                                    var timeRange = Qt.formatTime(st, "HH:mm") + " - " + Qt.formatTime(et, "HH:mm");
+                                    
+                                    workLogDialog.open(act.id, timeRange, content, type);
+                                } else {
+                                    // Original Logic: Reset zoom
+                                    timelineCanvas.viewStartHour = 0;
+                                    timelineCanvas.viewEndHour = 24;
+                                    timelineCanvas.requestPaint();
+                                }
                             }
 
                             onPositionChanged: {
@@ -574,7 +655,6 @@ Window {
                                     return;
                                 }
 
-                                var hoveredAct = null;
                                 var data = timelineCanvas.activityData;
                                 if (!data) return;
 
@@ -593,29 +673,7 @@ Window {
                                 var cursorTs = midnightTs + cursorTimeSec * 1000;
 
                                 // 1. Visual Hit Test (Priority: Matches what user sees)
-                                for (var k = 0; k < data.length; k++) {
-                                    var act = data[k];
-                                    var actStartSec = (act.startTime - midnightTs) / 1000;
-                                    var actEndSec = (act.endTime - midnightTs) / 1000;
-
-                                    // Visibility check
-                                    if (actEndSec < viewStartSec || actStartSec > viewEndSec) continue;
-
-                                    // Calculate visual geometry
-                                    var visibleStart = Math.max(actStartSec, viewStartSec);
-                                    var visibleEnd = Math.min(actEndSec, viewEndSec);
-                                    
-                                    var x = ((visibleStart - viewStartSec) / viewDurationSec) * w;
-                                    var bw = ((visibleEnd - visibleStart) / viewDurationSec) * w;
-                                    
-                                    // Ensure minimum visibility for short durations (matching onPaint)
-                                    if (bw < 2) bw = 2;
-
-                                    // Hit detection
-                                    if (mouseX >= x && mouseX <= x + bw) {
-                                        hoveredAct = act;
-                                    }
-                                }
+                                var hoveredAct = timelineCanvas.getVisualHoveredActivity(mouseX);
 
                                 // 2. Time-based Fallback (If visual missed but we are mathematically inside)
                                 // This prevents the "Huge Offline Gap" issue when visual hit test fails marginally
@@ -895,5 +953,25 @@ Window {
     
     ListModel {
         id: statsModel
+    }
+
+    WorkLogDialog {
+        id: workLogDialog
+        anchors.fill: parent
+        themeColor: dashboardWindow.themeColor
+        onSaved: {
+            // Call C++ backend to update
+            var success = activityLogger.updateActivityContent(id, content, type)
+            if (success) {
+                refreshData() // Refresh to show updated data if we visualize it later
+            }
+        }
+    }
+
+    ReportGeneratorDialog {
+        id: reportGeneratorDialog
+        anchors.fill: parent
+        themeColor: dashboardWindow.themeColor
+        currentDate: dashboardWindow.currentDate
     }
 }
