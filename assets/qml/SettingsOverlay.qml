@@ -250,38 +250,7 @@ Item {
                 }
             }
 
-            // 分割线
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: "#22ffffff"
-            }
-
-            // 活动分析按钮
-            Rectangle {
-                width: parent.width
-                height: 30
-                radius: 6
-                color: activityBtnArea.containsMouse ? Qt.rgba(1,1,1,0.1) : "transparent"
-                
-                Text {
-                    text: "📊 查看活动轨迹与效率"
-                    color: "white"
-                    font.pixelSize: 12
-                    anchors.centerIn: parent
-                }
-
-                MouseArea {
-                    id: activityBtnArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        settingsOverlay.close()
-                        mainWindow.showDashboard()
-                    }
-                }
-            }
+            // 移除旧入口
         }
         
         // 进入动画

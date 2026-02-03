@@ -9,7 +9,7 @@ Window {
     width: 1200
     height: 720
     visible: true
-    title: "活动轨迹与效率分析"
+    title: "时光足迹"
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.Window
     onVisibleChanged: {
@@ -25,8 +25,8 @@ Window {
     property var highlightFilter: null // { type: int, minDuration: int, startTime: qint64 }
     onHighlightFilterChanged: timelineCanvas.requestPaint()
     
-    // Legacy property for compatibility (removed usage but kept for safety if needed temporarily)
-    property int highlightedType: -1
+    // Calendar Popup Control
+    property bool showCalendar: false
 
     // Colors
     readonly property color colorFocus: "#00d2ff"   // Tech Blue
@@ -98,7 +98,7 @@ Window {
                 spacing: 15
 
                 Text {
-                    text: "📊 活动轨迹与效率分析"
+                    text: "📊 时光足迹"
                     font.pixelSize: 22
                     font.bold: true
                     color: "white"
@@ -127,12 +127,39 @@ Window {
                     }
                 }
 
-                Text {
-                    text: currentDate.toLocaleDateString(Qt.locale(), "yyyy年M月d日 dddd")
-                    font.pixelSize: 18
-                    font.bold: true
-                    color: "white"
+                MouseArea {
+                    width: dateTextRow.width + 30
+                    height: 40
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
                     Layout.alignment: Qt.AlignVCenter
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: parent.containsMouse ? Qt.rgba(1,1,1,0.1) : "transparent"
+                        radius: 8
+                        border.color: parent.containsMouse ? Qt.rgba(1,1,1,0.2) : "transparent"
+                    }
+
+                    Row {
+                        id: dateTextRow
+                        anchors.centerIn: parent
+                        spacing: 10
+                        Text {
+                            text: currentDate.toLocaleDateString(Qt.locale(), "yyyy年M月d日 dddd")
+                            font.pixelSize: 18
+                            font.bold: true
+                            color: "white"
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: "📅"
+                            font.pixelSize: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            opacity: 0.8
+                        }
+                    }
+                    onClicked: showCalendar = !showCalendar
                 }
 
                 Button {
@@ -973,5 +1000,43 @@ Window {
         anchors.fill: parent
         themeColor: dashboardWindow.themeColor
         currentDate: dashboardWindow.currentDate
+    }
+
+    // Calendar Overlay
+    Rectangle {
+        id: calendarOverlay
+        anchors.fill: parent
+        color: Qt.rgba(0,0,0,0.4)
+        visible: showCalendar
+        z: 100 // Ensure on top
+        
+        // Background click to close
+        MouseArea { 
+            anchors.fill: parent
+            onClicked: showCalendar = false
+        }
+        
+        // Prevent click propagation from calendar
+        MouseArea {
+            anchors.fill: calendarPicker
+            hoverEnabled: true
+        }
+
+        CalendarPicker {
+            id: calendarPicker
+            anchors.centerIn: parent
+            currentDate: dashboardWindow.currentDate
+            selectedDate: dashboardWindow.currentDate
+            
+            onDateSelected: {
+                dashboardWindow.currentDate = selectedDate
+                dashboardWindow.refreshData()
+                showCalendar = false
+            }
+        }
+
+        // Animation
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        opacity: showCalendar ? 1 : 0
     }
 }

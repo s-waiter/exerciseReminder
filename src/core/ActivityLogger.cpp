@@ -428,6 +428,19 @@ QString ActivityLogger::generateReport(const QDate& date, int range, int mode) {
 
     qint64 startTs = startDt.toSecsSinceEpoch();
     qint64 endTs = endDt.toSecsSinceEpoch();
+    
+    // Convert ms
+    return generateReportCustom(startTs * 1000, endTs * 1000, mode);
+}
+
+QString ActivityLogger::generateReportCustom(qint64 startMs, qint64 endMs, int mode) {
+    if (!m_dbInitialized) return "Error: Database not initialized.";
+
+    qint64 startTs = startMs / 1000;
+    qint64 endTs = endMs / 1000;
+    
+    QDateTime startDt = QDateTime::fromSecsSinceEpoch(startTs);
+    QDateTime endDt = QDateTime::fromSecsSinceEpoch(endTs);
 
     QSqlQuery query;
     // We only care about Focus Work (state='Focus') that has content

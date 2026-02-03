@@ -22,6 +22,9 @@ public:
     // range: 0=Day, 1=Week, 2=Month
     // mode: 0=Full(Self), 1=Formal(Leader)
     Q_INVOKABLE QString generateReport(const QDate& date, int range, int mode);
+    
+    // Custom Date Range Report
+    Q_INVOKABLE QString generateReportCustom(qint64 startMs, qint64 endMs, int mode);
 
 private slots:
     void onActivityStateChanged(TimerEngine::ActivityState newState);

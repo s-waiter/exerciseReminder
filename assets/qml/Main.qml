@@ -1341,7 +1341,10 @@ Window {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
-                        onClicked: hintAnim.restart()
+                        onClicked: {
+                            hintAnim.restart()
+                            timerEngine.startWork() // 单击重置
+                        }
                         // 支持鼠标滚轮直接调节时长
                         onWheel: {
                             var delta = wheel.angleDelta.y > 0 ? 1 : -1
@@ -1383,7 +1386,7 @@ Window {
 
                         Text {
                             id: hintText
-                            text: "使用鼠标滚轮修改"
+                            text: "鼠标滚轮修改,单击重置"
                             color: "white"
                             font.pixelSize: 12
                             font.family: "Microsoft YaHei"
@@ -1526,9 +1529,9 @@ Window {
                 }
 
                 CyberButton {
-                    text: "重置"
+                    text: "时光足迹"
                     btnColor: "#2C3E50"
-                    onClicked: timerEngine.startWork()
+                    onClicked: mainWindow.showDashboard()
                 }
             }
         }

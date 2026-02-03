@@ -11,22 +11,38 @@ Item {
 
     property color themeColor: "#00d2ff"
     property date currentDate: new Date()
-    property int selectedRange: 0 // 0:Day, 1:Week, 2:Month
+    property int selectedRange: 0 // 0:Day, 1:Week, 2:Month, 3:Custom
     property int selectedMode: 0 // 0:Self, 1:Formal
+    
+    property date customStartDate: new Date()
+    property date customEndDate: new Date()
+    property int pickingDateFor: 0 // 0:None, 1:Start, 2:End
 
     function open() {
         visible = true
         selectedRange = 0
         selectedMode = 0
+        customStartDate = new Date()
+        customEndDate = new Date()
         generate()
     }
 
     function close() {
         visible = false
+        pickingDateFor = 0
     }
 
     function generate() {
-        var text = activityLogger.generateReport(currentDate, selectedRange, selectedMode)
+        var text = ""
+        if (selectedRange === 3) {
+            var start = new Date(customStartDate)
+            start.setHours(0,0,0,0)
+            var end = new Date(customEndDate)
+            end.setHours(23,59,59,999)
+            text = activityLogger.generateReportCustom(start.getTime(), end.getTime(), selectedMode)
+        } else {
+            text = activityLogger.generateReport(currentDate, selectedRange, selectedMode)
+        }
         previewArea.text = text
     }
 
@@ -142,9 +158,9 @@ Item {
                     Row {
                         spacing: 8
                         Repeater {
-                            model: ["今日日报", "本周周报", "本月月报"]
+                            model: ["今日日报", "本周周报", "本月月报", "自定义"]
                             delegate: Rectangle {
-                                width: 90; height: 32; radius: 8
+                                width: 80; height: 32; radius: 8
                                 color: selectedRange === index ? themeColor : Qt.rgba(1,1,1,0.05)
                                 border.color: selectedRange === index ? "transparent" : Qt.rgba(1,1,1,0.1)
                                 
@@ -165,6 +181,44 @@ Item {
                                 }
                                 
                                 Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                        }
+                    }
+                    
+                    // Custom Date Pickers
+                    RowLayout {
+                        visible: selectedRange === 3
+                        spacing: 10
+                        opacity: visible ? 1.0 : 0.0
+                        Behavior on opacity { NumberAnimation { duration: 200 } }
+                        
+                        // Start Date
+                        Rectangle {
+                            width: 100; height: 28; radius: 6
+                            color: Qt.rgba(1,1,1,0.05); border.color: "#444"
+                            Text { 
+                                anchors.centerIn: parent
+                                text: Qt.formatDate(customStartDate, "yyyy-MM-dd")
+                                color: "white"; font.pixelSize: 12
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: pickingDateFor = 1
+                            }
+                        }
+                        Text { text: "至"; color: "#888"; font.pixelSize: 12 }
+                        // End Date
+                        Rectangle {
+                            width: 100; height: 28; radius: 6
+                            color: Qt.rgba(1,1,1,0.05); border.color: "#444"
+                            Text { 
+                                anchors.centerIn: parent
+                                text: Qt.formatDate(customEndDate, "yyyy-MM-dd")
+                                color: "white"; font.pixelSize: 12
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: pickingDateFor = 2
                             }
                         }
                     }
@@ -283,8 +337,6 @@ Item {
                             previewArea.copy()
                             previewArea.deselect()
                             toast.show("已复制到剪贴板 ✅")
-                            // Optional: Close after copy? User might want to keep it open. 
-                            // Let's keep it open but give feedback.
                         }
                     }
                     
@@ -302,6 +354,30 @@ Item {
             }
         }
         
+        // Calendar Popup Overlay
+        Rectangle {
+            id: calendarOverlay
+            anchors.fill: parent
+            color: Qt.rgba(0,0,0,0.4)
+            visible: pickingDateFor > 0
+            
+            MouseArea { anchors.fill: parent; onClicked: pickingDateFor = 0 }
+            
+            CalendarPicker {
+                anchors.centerIn: parent
+                currentDate: pickingDateFor === 1 ? customStartDate : customEndDate
+                selectedDate: currentDate
+                
+                onDateSelected: {
+                    if (pickingDateFor === 1) customStartDate = selectedDate
+                    else if (pickingDateFor === 2) customEndDate = selectedDate
+                    
+                    pickingDateFor = 0
+                    generate()
+                }
+            }
+        }
+        
         // Internal Toast
         Rectangle {
             id: toast
@@ -312,6 +388,7 @@ Item {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: 150
             opacity: 0
+            z: 100
             
             Text {
                 id: toastText

@@ -8,6 +8,7 @@
         <file>assets/qml/ActivityDashboard.qml</file>
         <file>assets/qml/WorkLogDialog.qml</file>
         <file>assets/qml/ReportGeneratorDialog.qml</file>
+        <file>assets/qml/CalendarPicker.qml</file>
         <file>assets/qml/UpdateDialog.qml</file>
         <file>assets/images/tray_icon.svg</file>
     </qresource>
