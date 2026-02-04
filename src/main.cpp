@@ -152,6 +152,12 @@ int main(int argc, char *argv[])
     QObject::connect(&windowUtils, &WindowUtils::sessionStateChanged, 
                      &timerEngine, &TimerEngine::handleSystemLock);
 
+    // 连接午休模式信号，控制系统休眠状态
+    // 当进入午休模式时阻止休眠，退出时恢复
+    QObject::connect(&timerEngine, &TimerEngine::isNapModeChanged, &windowUtils, [&]() {
+        windowUtils.setPreventSleep(timerEngine.isNapMode());
+    });
+
     // ========================================================================
     // 5. 初始化 QML 引擎 (前端加载)
     // ========================================================================

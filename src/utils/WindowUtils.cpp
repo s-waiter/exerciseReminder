@@ -190,3 +190,22 @@ QVariantMap WindowUtils::getScreenGeometryAtCursor() {
     }
     return result;
 }
+
+void WindowUtils::setPreventSleep(bool prevent) {
+#ifdef Q_OS_WIN
+    if (prevent) {
+        // ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+        // 阻止系统休眠并保持显示器开启
+        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+        qDebug() << "WindowUtils: System sleep prevented.";
+    } else {
+        // ES_CONTINUOUS
+        // 清除之前的状态，恢复系统正常休眠策略
+        SetThreadExecutionState(ES_CONTINUOUS);
+        qDebug() << "WindowUtils: System sleep restored.";
+    }
+#else
+    // Linux/macOS implementation placeholder
+    Q_UNUSED(prevent);
+#endif
+}

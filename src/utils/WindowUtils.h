@@ -33,6 +33,11 @@ public:
     // 用于手动启动时，让窗口出现在用户操作的那个屏幕上
     Q_INVOKABLE QVariantMap getScreenGeometryAtCursor();
 
+    // 设置是否阻止系统休眠
+    // prevent: true = 阻止休眠 (用于午休模式等需要持续显示的场景)
+    // prevent: false = 恢复正常 (允许休眠)
+    Q_INVOKABLE void setPreventSleep(bool prevent);
+
 signals:
     // 当系统会话状态改变时触发（true=锁屏, false=解锁）
     void sessionStateChanged(bool locked);
