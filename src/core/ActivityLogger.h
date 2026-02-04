@@ -26,6 +26,9 @@ public:
     // Custom Date Range Report
     Q_INVOKABLE QString generateReportCustom(qint64 startMs, qint64 endMs, int mode);
 
+    // Get list of days in a month that have activity (for Calendar UI)
+    Q_INVOKABLE QVariantList getActiveDatesInMonth(int year, int month);
+
 private slots:
     void onActivityStateChanged(TimerEngine::ActivityState newState);
     // 处理手动记录的运动
@@ -42,5 +45,8 @@ private:
     TimerEngine* m_engine;
     TimerEngine::ActivityState m_currentState;
     QDateTime m_currentStartTime;
+    QString m_currentContent;
+    int m_currentWorkType = 0;
+    qint64 m_currentId = -1;
     bool m_dbInitialized = false;
 };

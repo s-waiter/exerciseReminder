@@ -14,12 +14,16 @@ Item {
     property string formalContent: ""
     property string learningContent: ""
     property string personalContent: ""
+    property string memoContent: ""
+    property string thoughtContent: ""
     
     // Theme Colors
     property color themeColor: "#00d2ff"
     property color colorFormal: "#00d2ff"   // Blue
     property color colorLearning: "#00ff88" // Green
     property color colorPersonal: "#ffbf00" // Yellow
+    property color colorMemo: "#E056FD"     // Purple/Pink
+    property color colorThought: "#00E5FF"  // Cyan
     property color colorBgStart: "#F01B2A4E"
     property color colorBgEnd: "#F016203A"
 
@@ -33,6 +37,8 @@ Item {
         formalContent = ""
         learningContent = ""
         personalContent = ""
+        memoContent = ""
+        thoughtContent = ""
         
         if (content.trim().indexOf("{") === 0) {
             try {
@@ -40,6 +46,8 @@ Item {
                 formalContent = json.formal || ""
                 learningContent = json.learning || ""
                 personalContent = json.personal || ""
+                memoContent = json.memo || ""
+                thoughtContent = json.thought || ""
             } catch (e) {
                 console.log("JSON parse error:", e)
                 formalContent = content // Fallback
@@ -155,7 +163,9 @@ Item {
                         model: [
                             { text: "正式工作", color: colorFormal, icon: "🔵" },
                             { text: "学习成长", color: colorLearning, icon: "🟢" },
-                            { text: "私人事务", color: colorPersonal, icon: "🟡" }
+                            { text: "私人事务", color: colorPersonal, icon: "🟡" },
+                            { text: "备忘便签", color: colorMemo, icon: "🟣" },
+                            { text: "随想灵感", color: colorThought, icon: "💠" }
                         ]
                         
                         property int currentIndex: 0
@@ -191,6 +201,8 @@ Item {
                                     if (index === 0) return workLogOverlay.formalContent.length > 0
                                     if (index === 1) return workLogOverlay.learningContent.length > 0
                                     if (index === 2) return workLogOverlay.personalContent.length > 0
+                                    if (index === 3) return workLogOverlay.memoContent.length > 0
+                                    if (index === 4) return workLogOverlay.thoughtContent.length > 0
                                     return false
                                 }
                             }
@@ -233,6 +245,22 @@ Item {
                     text: workLogOverlay.personalContent
                     onTextChanged: workLogOverlay.personalContent = text
                     accentColor: colorPersonal
+                }
+                
+                // 4. Memo
+                TextAreaInput {
+                    placeholderText: "在此记录备忘便签..."
+                    text: workLogOverlay.memoContent
+                    onTextChanged: workLogOverlay.memoContent = text
+                    accentColor: colorMemo
+                }
+                
+                // 5. Thoughts
+                TextAreaInput {
+                    placeholderText: "在此记录随想灵感..."
+                    text: workLogOverlay.thoughtContent
+                    onTextChanged: workLogOverlay.thoughtContent = text
+                    accentColor: colorThought
                 }
             }
 
@@ -296,7 +324,9 @@ Item {
                         var data = {
                             "formal": workLogOverlay.formalContent,
                             "learning": workLogOverlay.learningContent,
-                            "personal": workLogOverlay.personalContent
+                            "personal": workLogOverlay.personalContent,
+                            "memo": workLogOverlay.memoContent,
+                            "thought": workLogOverlay.thoughtContent
                         }
                         var jsonStr = JSON.stringify(data)
                         

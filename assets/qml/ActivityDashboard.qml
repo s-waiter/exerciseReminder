@@ -1028,6 +1028,12 @@ Window {
             currentDate: dashboardWindow.currentDate
             selectedDate: dashboardWindow.currentDate
             
+            onMonthChanged: {
+                // Fetch active dates from backend when month changes (or initially)
+                // year and month are passed from the signal
+                activeDays = activityLogger.getActiveDatesInMonth(year, month)
+            }
+            
             onDateSelected: {
                 dashboardWindow.currentDate = selectedDate
                 dashboardWindow.refreshData()

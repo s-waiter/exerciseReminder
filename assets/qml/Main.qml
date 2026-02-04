@@ -114,26 +114,42 @@ Window {
             item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
             item.closing.connect(function() {
                 dashboardLoader.active = false
-                // Restore main window position and visibility
-                mainWindow.x = savedX
-                mainWindow.y = savedY
-                mainWindow.visible = true
-                mainWindow.opacity = 1
-                mainWindow.requestActivate()
-                // Re-enable animation after restoration
-                enableAnimationTimer.restart()
+                // Restore main window position and visibility ONLY if it was hidden
+                if (!mainWindow.visible) {
+                    mainWindow.x = savedX
+                    mainWindow.y = savedY
+                    mainWindow.visible = true
+                    mainWindow.opacity = 1
+                    mainWindow.requestActivate()
+                    enableAnimationTimer.restart()
+                } else {
+                    // If it was already visible (Mini Mode), just activate it
+                    mainWindow.requestActivate()
+                }
             })
         }
     }
     
     function showDashboard() {
+        // If dashboard is already active, just bring it to front
+        if (dashboardLoader.active && dashboardLoader.item) {
+            dashboardLoader.item.visible = true
+            dashboardLoader.item.raise()
+            dashboardLoader.item.requestActivate()
+            return
+        }
+
         // Save position and move off-screen to prevent ghosting
-        savedX = x
-        savedY = y
-        animationEnabled = false // Disable animation for instant move
-        mainWindow.x = -10000
-        mainWindow.opacity = 0
-        mainWindow.visible = false
+        // Only hide main window if NOT in mini mode (Normal mode)
+        // In Mini Mode, we keep the floating ball visible
+        if (!isPinned) {
+            savedX = x
+            savedY = y
+            animationEnabled = false // Disable animation for instant move
+            mainWindow.x = -10000
+            mainWindow.opacity = 0
+            mainWindow.visible = false
+        }
         
         // Delay opening dashboard
         openDashboardTimer.restart()
@@ -1302,6 +1318,13 @@ Window {
                             label: "午休助眠"
                             shortcut: "四击"
                             onTriggered: timerEngine.startNap()
+                        }
+                        
+                        MenuItemRow {
+                            icon: "📊"
+                            label: "时光足迹"
+                            shortcut: ""
+                            onTriggered: mainWindow.showDashboard()
                         }
                         
                         // 底部间距

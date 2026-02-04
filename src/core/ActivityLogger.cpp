@@ -3,6 +3,8 @@
 #include <QDir>
 #include <QDebug>
 #include <QSqlError>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 ActivityLogger::ActivityLogger(TimerEngine* engine, QObject *parent)
     : QObject(parent), m_engine(engine), m_currentState(TimerEngine::State_Offline)
@@ -73,6 +75,12 @@ void ActivityLogger::initDatabase() {
         query.exec("ALTER TABLE activity_log ADD COLUMN content TEXT");
         query.exec("ALTER TABLE activity_log ADD COLUMN work_type INTEGER DEFAULT 0");
     }
+
+    // Crash Recovery: Close any sessions that have 0 duration (orphaned by crash)
+    // We set end_time = start_time + 60 (1 min) to gracefully close them
+    // Only affect rows where end_time is 0 or NULL (if schema allows NULL, but we use 0)
+    QSqlQuery cleanupQuery;
+    cleanupQuery.exec("UPDATE activity_log SET end_time = start_time + 60, duration = 60 WHERE (end_time = 0 OR end_time IS NULL) AND start_time > 0");
 }
 
 void ActivityLogger::onActivityStateChanged(TimerEngine::ActivityState newState) {
@@ -152,35 +160,64 @@ void ActivityLogger::onManualExerciseRecorded(int durationSeconds) {
 void ActivityLogger::closeCurrentSession(const QDateTime& customEndTime) {
     if (!m_dbInitialized) return;
     
+    // If no active session ID, nothing to update
+    if (m_currentId == -1) return;
+
     QDateTime endTime = customEndTime.isValid() ? customEndTime : QDateTime::currentDateTime();
     
     // 如果结束时间早于开始时间，直接忽略 (无效会话)
     if (endTime < m_currentStartTime) {
         qDebug() << "Ignoring invalid session duration (end < start):" << stateToString(m_currentState);
+        // Delete the invalid row? Or just leave it as orphaned?
+        // Let's delete it to keep DB clean
+        QSqlQuery delQuery;
+        delQuery.prepare("DELETE FROM activity_log WHERE id = ?");
+        delQuery.addBindValue(m_currentId);
+        delQuery.exec();
+        m_currentId = -1;
         return;
     }
     
     qint64 duration = m_currentStartTime.secsTo(endTime);
 
-    // If duration is too short (e.g. < 1s), maybe ignore? But for timeline accuracy, keep it.
-    
     QSqlQuery query;
-    query.prepare("INSERT INTO activity_log (state, start_time, end_time, duration) VALUES (?, ?, ?, ?)");
-    query.addBindValue(stateToString(m_currentState));
-    query.addBindValue(m_currentStartTime.toSecsSinceEpoch());
+    query.prepare("UPDATE activity_log SET end_time = ?, duration = ? WHERE id = ?");
     query.addBindValue(endTime.toSecsSinceEpoch());
     query.addBindValue(duration);
+    query.addBindValue(m_currentId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to log session:" << query.lastError();
+        qWarning() << "Failed to close session:" << query.lastError();
     } else {
-        qDebug() << "Logged session:" << stateToString(m_currentState) << duration << "s";
+        qDebug() << "Closed session:" << stateToString(m_currentState) << duration << "s (ID:" << m_currentId << ")";
     }
+    
+    m_currentId = -1; // Reset ID
 }
 
 void ActivityLogger::startNewSession(TimerEngine::ActivityState state) {
     m_currentState = state;
     m_currentStartTime = QDateTime::currentDateTime();
+    m_currentContent = "";
+    m_currentWorkType = 0;
+    
+    if (!m_dbInitialized) return;
+
+    // Insert immediately to persist the start of the session
+    QSqlQuery query;
+    query.prepare("INSERT INTO activity_log (state, start_time, end_time, duration, content, work_type) VALUES (?, ?, 0, 0, ?, ?)");
+    query.addBindValue(stateToString(m_currentState));
+    query.addBindValue(m_currentStartTime.toSecsSinceEpoch());
+    query.addBindValue(m_currentContent);
+    query.addBindValue(m_currentWorkType);
+
+    if (query.exec()) {
+        m_currentId = query.lastInsertId().toLongLong();
+        qDebug() << "Started new session:" << stateToString(m_currentState) << "(ID:" << m_currentId << ")";
+    } else {
+        qWarning() << "Failed to start new session:" << query.lastError();
+        m_currentId = -1;
+    }
 }
 
 QString ActivityLogger::stateToString(TimerEngine::ActivityState state) {
@@ -210,7 +247,7 @@ QVariantList ActivityLogger::getDailyActivities(const QDate& date) {
     qint64 endTs = dayEnd.toSecsSinceEpoch();
 
     QSqlQuery query;
-    query.prepare("SELECT id, state, start_time, end_time, duration, content, work_type FROM activity_log WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC");
+    query.prepare("SELECT id, state, start_time, end_time, duration, content, work_type FROM activity_log WHERE start_time >= ? AND start_time <= ? AND end_time > 0 ORDER BY start_time ASC");
     query.addBindValue(startTs);
     query.addBindValue(endTs);
 
@@ -247,11 +284,14 @@ QVariantList ActivityLogger::getDailyActivities(const QDate& date) {
     // Add current ongoing session if it matches today
     if (m_currentStartTime.date() == date) {
          QVariantMap map;
+         map["id"] = m_currentId; // Use real DB ID
          map["state"] = stateToString(m_currentState);
          map["startTime"] = m_currentStartTime.toSecsSinceEpoch() * 1000;
          map["endTime"] = QDateTime::currentDateTime().toSecsSinceEpoch() * 1000;
          map["duration"] = m_currentStartTime.secsTo(QDateTime::currentDateTime());
          map["type"] = (int)m_currentState;
+         map["content"] = m_currentContent;
+         map["workType"] = m_currentWorkType;
          map["isOngoing"] = true;
          list.append(map);
     }
@@ -288,7 +328,7 @@ QVariantMap ActivityLogger::getDailyStats(const QDate& date) {
     QSqlQuery query;
     // Use the same filtering logic as getDailyActivities to ensure consistency
     // Fetch all records for the day and aggregate manually, avoiding GROUP BY issues
-    query.prepare("SELECT state, duration, start_time FROM activity_log WHERE start_time >= ? AND start_time <= ?");
+    query.prepare("SELECT state, duration, start_time FROM activity_log WHERE start_time >= ? AND start_time <= ? AND end_time > 0");
     query.addBindValue(startTs);
     query.addBindValue(endTs);
 
@@ -394,6 +434,13 @@ QVariantMap ActivityLogger::getDailyStats(const QDate& date) {
 bool ActivityLogger::updateActivityContent(int id, const QString& content, int workType) {
     if (!m_dbInitialized) return false;
 
+    // Handle ongoing session update
+    if (id == m_currentId) {
+        m_currentContent = content;
+        m_currentWorkType = workType;
+        qDebug() << "Updated ongoing session content in memory:" << content;
+    }
+
     QSqlQuery query;
     query.prepare("UPDATE activity_log SET content = ?, work_type = ? WHERE id = ?");
     query.addBindValue(content);
@@ -474,38 +521,24 @@ QString ActivityLogger::generateReportCustom(qint64 startMs, qint64 endMs, int m
             .arg(eDt.toString("HH:mm"))
             .arg(duration / 60);
 
-        // Parse JSON content if it starts with {
-        // Expected format: {"formal":"...", "learning":"...", "personal":"..."}
-        QString formal, learning, personal;
+        // Parse JSON content
+        QString formal, learning, personal, memo, thought;
         bool isJson = content.trimmed().startsWith("{");
         
         if (isJson) {
-            // "formal":"..."
-            int fStart = content.indexOf("\"formal\":\"");
-            if (fStart != -1) {
-                fStart += 10;
-                int fEnd = content.indexOf("\"", fStart);
-                if (fEnd != -1) formal = content.mid(fStart, fEnd - fStart);
+            QJsonDocument doc = QJsonDocument::fromJson(content.toUtf8());
+            if (!doc.isNull() && doc.isObject()) {
+                QJsonObject obj = doc.object();
+                formal = obj.value("formal").toString();
+                learning = obj.value("learning").toString();
+                personal = obj.value("personal").toString();
+                memo = obj.value("memo").toString();
+                thought = obj.value("thought").toString();
+            } else {
+                // Fallback to manual parsing if QJsonDocument fails (unlikely if valid JSON)
+                // or just treat as raw content? Let's assume valid JSON or empty.
+                qWarning() << "Failed to parse JSON content in report generation:" << content;
             }
-            
-            int lStart = content.indexOf("\"learning\":\"");
-            if (lStart != -1) {
-                lStart += 12;
-                int lEnd = content.indexOf("\"", lStart);
-                if (lEnd != -1) learning = content.mid(lStart, lEnd - lStart);
-            }
-            
-            int pStart = content.indexOf("\"personal\":\"");
-            if (pStart != -1) {
-                pStart += 12;
-                int pEnd = content.indexOf("\"", pStart);
-                if (pEnd != -1) personal = content.mid(pStart, pEnd - pStart);
-            }
-            
-            // Unescape (basic)
-            formal.replace("\\n", "\n");
-            learning.replace("\\n", "\n");
-            personal.replace("\\n", "\n");
         } else {
             // Legacy fallback: use workType to determine category
             // 0: Formal, 1: Learning, 2: Personal
@@ -533,6 +566,18 @@ QString ActivityLogger::generateReportCustom(qint64 startMs, qint64 endMs, int m
             report += QString("🟡 %1 %2\n").arg(timeStr).arg(personal);
             hasOutput = true;
         }
+
+        // Memo (Skip in Leader Mode)
+        if (mode == 0 && !memo.isEmpty()) {
+            report += QString("🟣 %1 %2\n").arg(timeStr).arg(memo);
+            hasOutput = true;
+        }
+
+        // Thought (Skip in Leader Mode)
+        if (mode == 0 && !thought.isEmpty()) {
+            report += QString("💠 %1 %2\n").arg(timeStr).arg(thought);
+            hasOutput = true;
+        }
         
         if (hasOutput) count++;
     }
@@ -540,4 +585,56 @@ QString ActivityLogger::generateReportCustom(qint64 startMs, qint64 endMs, int m
     if (count == 0) report += "（无记录）\n";
     
     return report;
+}
+
+QVariantList ActivityLogger::getActiveDatesInMonth(int year, int month) {
+    QVariantList list;
+    if (!m_dbInitialized) return list;
+
+    // Calculate start and end of month
+    QDate startD(year, month + 1, 1); // JS month is 0-indexed, but Qt QDate is 1-indexed. Wait, caller usually passes JS month (0-11).
+    // Let's assume input is 0-indexed (JS style) to match QML expectations, or 1-indexed?
+    // QML CalendarPicker passes `currentMonth` which is 0-11.
+    // So QDate expects 1-12.
+    
+    int qDateMonth = month + 1;
+    QDate startDate(year, qDateMonth, 1);
+    QDate endDate = startDate.addMonths(1).addDays(-1);
+    
+    qint64 startTs = QDateTime(startDate, QTime(0, 0, 0)).toSecsSinceEpoch();
+    qint64 endTs = QDateTime(endDate, QTime(23, 59, 59)).toSecsSinceEpoch();
+
+    QSqlQuery query;
+    // We want days that have ANY activity.
+    // Efficiently, we can just select all start_times and process in C++ since DB is local and small.
+    // Or select DISTINCT date if using sqlite functions, but portability...
+    // Let's just select start_time.
+    
+    query.prepare("SELECT start_time FROM activity_log WHERE start_time >= ? AND start_time <= ?");
+    query.addBindValue(startTs);
+    query.addBindValue(endTs);
+
+    QSet<int> activeDays;
+
+    if (query.exec()) {
+        while (query.next()) {
+            qint64 ts = query.value(0).toLongLong();
+            QDateTime dt = QDateTime::fromSecsSinceEpoch(ts);
+            // Local time day
+            activeDays.insert(dt.date().day());
+        }
+    } else {
+        qWarning() << "getActiveDatesInMonth query failed:" << query.lastError();
+    }
+    
+    // Also check current ongoing session
+    if (m_currentState != TimerEngine::State_Offline && m_currentStartTime.date().year() == year && m_currentStartTime.date().month() == qDateMonth) {
+        activeDays.insert(m_currentStartTime.date().day());
+    }
+
+    for (int day : activeDays) {
+        list.append(day);
+    }
+    
+    return list;
 }

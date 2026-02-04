@@ -5,11 +5,12 @@ import QtGraphicalEffects 1.15
 
 Item {
     id: calendarPicker
-    width: 320
-    height: 360
+    width: 340
+    height: 380
     
     // Signals
     signal dateSelected(date selectedDate)
+    signal monthChanged(int year, int month)
     
     // Properties
     property date currentDate: new Date()
@@ -17,16 +18,23 @@ Item {
     property color themeColor: "#00d2ff"
     property color backgroundColor: "#1B2A4E"
     property color textColor: "#FFFFFF"
+    property var activeDays: [] // Array of day numbers (int) that have data
     
     // Internal
     property int currentMonth: currentDate.getMonth()
     property int currentYear: currentDate.getFullYear()
+
+    onCurrentDateChanged: {
+        currentMonth = currentDate.getMonth()
+        currentYear = currentDate.getFullYear()
+        selectedDate = currentDate
+        refreshCalendar()
+    }
     
     function setDate(date) {
-        selectedDate = date
-        currentMonth = date.getMonth()
-        currentYear = date.getFullYear()
-        refreshCalendar()
+        // This function might be redundant if we bind to currentDate, 
+        // but kept for imperative usage
+        currentDate = date
     }
     
     function refreshCalendar() {
@@ -65,28 +73,68 @@ Item {
                 "date": new Date(currentYear, currentMonth + 1, i)
             })
         }
+        
+        // Notify parent to fetch data
+        monthChanged(currentYear, currentMonth)
+    }
+    
+    function previousMonth() {
+        if (currentMonth === 0) {
+            currentMonth = 11
+            currentYear--
+        } else {
+            currentMonth--
+        }
+        refreshCalendar()
+    }
+    
+    function nextMonth() {
+        if (currentMonth === 11) {
+            currentMonth = 0
+            currentYear++
+        } else {
+            currentMonth++
+        }
+        refreshCalendar()
     }
     
     Component.onCompleted: refreshCalendar()
     
+    // Main Background
     Rectangle {
         anchors.fill: parent
         color: backgroundColor
-        radius: 12
+        radius: 16
         border.color: Qt.rgba(1,1,1,0.1)
+        border.width: 1
         
         layer.enabled: true
         layer.effect: DropShadow {
             transparentBorder: true
             color: "#80000000"
-            radius: 16
-            samples: 17
+            radius: 20
+            samples: 25
+            verticalOffset: 5
+        }
+        
+        // Mouse Wheel Handler for Month Navigation
+        MouseArea {
+            anchors.fill: parent
+            z: 0 // Behind buttons but covers grid
+            propagateComposedEvents: true
+            onWheel: {
+                if (wheel.angleDelta.y > 0) {
+                    previousMonth()
+                } else {
+                    nextMonth()
+                }
+            }
         }
         
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
+            anchors.margins: 20
+            spacing: 15
             
             // Header
             RowLayout {
@@ -96,18 +144,22 @@ Item {
                 Button {
                     text: "<"
                     flat: true
-                    Layout.preferredWidth: 30
-                    contentItem: Text { text: "<"; color: textColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { color: parent.pressed ? Qt.rgba(1,1,1,0.1) : "transparent"; radius: 4 }
-                    onClicked: {
-                        if (currentMonth === 0) {
-                            currentMonth = 11
-                            currentYear--
-                        } else {
-                            currentMonth--
-                        }
-                        refreshCalendar()
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 36
+                    
+                    background: Rectangle {
+                        color: parent.hovered ? Qt.rgba(1,1,1,0.1) : "transparent"
+                        radius: 18
                     }
+                    contentItem: Text { 
+                        text: "◀"
+                        color: textColor
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter 
+                        opacity: 0.8
+                    }
+                    onClicked: previousMonth()
                 }
                 
                 // Month Year Label
@@ -119,26 +171,31 @@ Item {
                         return currentYear + "年 " + months[currentMonth]
                     }
                     color: textColor
-                    font.pixelSize: 16
+                    font.pixelSize: 18
                     font.bold: true
+                    font.family: "Microsoft YaHei UI"
                 }
                 
                 // Next Month
                 Button {
                     text: ">"
                     flat: true
-                    Layout.preferredWidth: 30
-                    contentItem: Text { text: ">"; color: textColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                    background: Rectangle { color: parent.pressed ? Qt.rgba(1,1,1,0.1) : "transparent"; radius: 4 }
-                    onClicked: {
-                        if (currentMonth === 11) {
-                            currentMonth = 0
-                            currentYear++
-                        } else {
-                            currentMonth++
-                        }
-                        refreshCalendar()
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 36
+                    
+                    background: Rectangle {
+                        color: parent.hovered ? Qt.rgba(1,1,1,0.1) : "transparent"
+                        radius: 18
                     }
+                    contentItem: Text { 
+                        text: "▶" 
+                        color: textColor 
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter 
+                        verticalAlignment: Text.AlignVCenter
+                        opacity: 0.8
+                    }
+                    onClicked: nextMonth()
                 }
             }
             
@@ -154,8 +211,9 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: modelData
-                            color: "#888888"
-                            font.pixelSize: 12
+                            color: Qt.rgba(255, 255, 255, 0.5)
+                            font.pixelSize: 13
+                            font.bold: true
                         }
                     }
                 }
@@ -188,31 +246,61 @@ Item {
                                model.date.getMonth() === today.getMonth() && 
                                model.date.getFullYear() === today.getFullYear()
                     }
+                    
+                    property bool hasData: {
+                        if (!model.isCurrentMonth) return false
+                        if (!calendarPicker.activeDays) return false
+                        for(var i=0; i<calendarPicker.activeDays.length; i++) {
+                            if (calendarPicker.activeDays[i] === model.day) return true
+                        }
+                        return false
+                    }
 
                     Rectangle {
-                        width: 32
-                        height: 32
-                        radius: 16
+                        width: 36
+                        height: 36
+                        radius: 18
                         anchors.centerIn: parent
-                        color: isSelected ? themeColor : (isToday ? Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.2) : "transparent")
+                        
+                        // Selection Background
+                        color: isSelected ? themeColor : "transparent"
+                        
+                        // Today Border
                         border.color: isToday && !isSelected ? themeColor : "transparent"
                         border.width: 1
                         
                         Behavior on color { ColorAnimation { duration: 150 } }
                         
+                        // Text
                         Text {
                             anchors.centerIn: parent
                             text: model.day
-                            color: isSelected ? "white" : (model.isCurrentMonth ? textColor : "#666666")
+                            color: isSelected ? "white" : (model.isCurrentMonth ? textColor : Qt.rgba(255,255,255,0.3))
                             font.bold: isSelected || isToday
+                            font.pixelSize: 14
+                        }
+                        
+                        // Data Indicator Dot
+                        Rectangle {
+                            width: 4
+                            height: 4
+                            radius: 2
+                            color: isSelected ? "white" : themeColor
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 4
+                            visible: hasData
+                            opacity: isSelected ? 0.8 : 1.0
                         }
                     }
                     
                     MouseArea {
                         anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             selectedDate = model.date
                             dateSelected(selectedDate)
+                            // Just update local selection visually immediately
                             calendarGrid.forceLayout()
                         }
                     }

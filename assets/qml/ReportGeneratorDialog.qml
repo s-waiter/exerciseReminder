@@ -368,6 +368,10 @@ Item {
                 currentDate: pickingDateFor === 1 ? customStartDate : customEndDate
                 selectedDate: currentDate
                 
+                onMonthChanged: {
+                    activeDays = activityLogger.getActiveDatesInMonth(year, month)
+                }
+                
                 onDateSelected: {
                     if (pickingDateFor === 1) customStartDate = selectedDate
                     else if (pickingDateFor === 2) customEndDate = selectedDate
