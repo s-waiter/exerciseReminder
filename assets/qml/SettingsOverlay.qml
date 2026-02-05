@@ -26,7 +26,7 @@ Item {
         id: settingsDialog
         anchors.centerIn: parent
         width: 200 
-        height: 180 
+        height: 220 
         radius: 16 
         color: "#F01B2A4E" // 增加不透明度，提升质感
         border.color: settingsDialogMouseArea.containsMouse ? 
@@ -97,6 +97,48 @@ Item {
                     onToggled: appConfig.autoStart = checked
                     
                     scale: 0.7 // 稍微缩小开关以适应紧凑布局
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    
+                    indicator: Rectangle {
+                        implicitWidth: 40
+                        implicitHeight: 20
+                        radius: 10
+                        color: parent.checked ? themeColor : "#33ffffff"
+                        border.color: parent.checked ? themeColor : "#cccccc"
+                        
+                        Rectangle {
+                            x: parent.parent.checked ? parent.width - width - 2 : 2
+                            width: 16
+                            height: 16
+                            radius: 8
+                            color: "white"
+                            anchors.verticalCenter: parent.verticalCenter
+                            Behavior on x { NumberAnimation { duration: 100 } }
+                        }
+                    }
+                }
+            }
+
+            // 整点报时开关
+            Item {
+                width: parent.width
+                height: 20
+                
+                Text {
+                    text: "整点报时"
+                    color: "#DDDDDD"
+                    font.pixelSize: 12
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -2
+                }
+                
+                Switch {
+                    checked: appConfig.hourlyChimeEnabled
+                    onToggled: appConfig.hourlyChimeEnabled = checked
+                    
+                    scale: 0.7
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     

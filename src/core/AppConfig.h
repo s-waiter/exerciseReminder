@@ -29,6 +29,12 @@ class AppConfig : public QObject
     Q_PROPERTY(bool forcedExercise READ isForcedExercise WRITE setForcedExercise NOTIFY forcedExerciseChanged)
     Q_PROPERTY(int forcedExerciseDuration READ forcedExerciseDuration WRITE setForcedExerciseDuration NOTIFY forcedExerciseDurationChanged)
 
+    // 整点报时开关 (新增)
+    Q_PROPERTY(bool hourlyChimeEnabled READ isHourlyChimeEnabled WRITE setHourlyChimeEnabled NOTIFY hourlyChimeEnabledChanged)
+
+    // 工作时长 (分钟) - 持久化存储
+    Q_PROPERTY(int workDuration READ workDuration WRITE setWorkDuration NOTIFY workDurationChanged)
+
 public:
     explicit AppConfig(QObject *parent = nullptr);
 
@@ -48,11 +54,23 @@ public:
     // 设置强制运动时长 (分钟)
     void setForcedExerciseDuration(int minutes);
 
+    // 读取整点报时开关
+    bool isHourlyChimeEnabled() const;
+    // 设置整点报时开关
+    void setHourlyChimeEnabled(bool enabled);
+
+    // 读取工作时长
+    int workDuration() const;
+    // 设置工作时长
+    void setWorkDuration(int minutes);
+
 signals:
     // 当开机自启状态改变时触发
     void autoStartChanged(bool autoStart);
     void forcedExerciseChanged(bool enabled);
     void forcedExerciseDurationChanged(int minutes);
+    void hourlyChimeEnabledChanged(bool enabled);
+    void workDurationChanged(int minutes);
 
 private:
     // Windows 注册表路径，用于设置开机自启

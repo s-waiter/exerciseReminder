@@ -95,6 +95,47 @@ void AppConfig::setForcedExerciseDuration(int minutes)
 }
 
 // ========================================================================
+// 读取/设置：整点报时开关
+// ========================================================================
+bool AppConfig::isHourlyChimeEnabled() const
+{
+    QSettings settings("TraeAI", "DeskCare");
+    return settings.value("hourlyChimeEnabled", true).toBool(); // 默认开启
+}
+
+void AppConfig::setHourlyChimeEnabled(bool enabled)
+{
+    QSettings settings("TraeAI", "DeskCare");
+    if (isHourlyChimeEnabled() != enabled) {
+        settings.setValue("hourlyChimeEnabled", enabled);
+        emit hourlyChimeEnabledChanged(enabled);
+    }
+}
+
+// ========================================================================
+// 读取/设置：工作时长
+// ========================================================================
+int AppConfig::workDuration() const
+{
+    QSettings settings("TraeAI", "DeskCare");
+    int val = settings.value("workDuration", 45).toInt(); // 默认 45 分钟
+    if (val < 1) val = 1;
+    if (val > 120) val = 120;
+    return val;
+}
+
+void AppConfig::setWorkDuration(int minutes)
+{
+    if (minutes < 1 || minutes > 120) return;
+
+    QSettings settings("TraeAI", "DeskCare");
+    if (workDuration() != minutes) {
+        settings.setValue("workDuration", minutes);
+        emit workDurationChanged(minutes);
+    }
+}
+
+// ========================================================================
 // 设置：是否开机自启
 // ========================================================================
 // 修改系统的开机自启设置。

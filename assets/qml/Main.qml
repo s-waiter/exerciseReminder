@@ -20,6 +20,9 @@ Window {
 
     // 启动时静默检查更新
     Component.onCompleted: {
+        // Sync timer duration from saved config
+        timerEngine.workDurationMinutes = appConfig.workDuration
+        
         updateManager.checkForUpdates(true)
         
         // 检查是否是开机自启
@@ -87,6 +90,30 @@ Window {
             
             // 标记初始化完成，此时窗口才会变为 visible
             isInitialized = true
+        }
+    }
+
+    // 整点报时检测计时器
+    Timer {
+        id: hourlyChimeTimer
+        interval: 1000 * 10 // 每10秒检查一次，避免错过整点 (不需要每秒，也不要太久)
+        repeat: true
+        running: appConfig.hourlyChimeEnabled
+        property int lastChimeHour: -1
+        
+        onTriggered: {
+            var date = new Date()
+            var min = date.getMinutes()
+            var hour = date.getHours()
+            
+            // 容差范围：0分0秒 到 0分59秒 之间，且当前小时未报过
+            if (min === 0 && lastChimeHour !== hour) {
+                // 仅在迷你模式下触发
+                if (mainWindow.isPinned) {
+                    fluxChime.trigger()
+                    lastChimeHour = hour
+                }
+            }
         }
     }
     
@@ -830,6 +857,9 @@ Window {
                 width: parent.width
                 height: parent.height
                 
+                // 当整点报时特效显示时，隐藏中间的信息内容，防止重叠
+                visible: !fluxChime.visible
+                
                 // 使用 State 和 Transition 明确管理状态切换，避免视觉重叠
                 // 逻辑升级：增加 hasMouseExitedSinceMiniMode 条件
                 // 只有当：是 Mini 模式 AND 鼠标悬停 AND 鼠标已经移出过一次 后，才显示 PEEK
@@ -991,6 +1021,13 @@ Window {
                 }
             }
 
+            // 灵动整点报时特效组件
+            FluxChime {
+                id: fluxChime
+                anchors.fill: parent
+                z: 50 // 确保覆盖在文字信息之上
+            }
+
             // 交互层：点击暂停/继续，双击切换模式，三击立即休息，右击菜单
             MouseArea {
                 id: centerMouseArea
@@ -1102,11 +1139,10 @@ Window {
                     if (mouse.button === Qt.RightButton) {
                         // 仅在迷你模式 (isPinned) 下显示右键菜单
                         if (mainWindow.isPinned) {
-                            var globalPos = centerMouseArea.mapToGlobal(mouseX, mouseY)
-                            quickMenu.x = globalPos.x + 10
-                            quickMenu.y = globalPos.y + 10
-                            quickMenu.show()
-                            quickMenu.requestActivate() // 强制获取焦点，确保 onActiveChanged 能正常触发关闭
+                            // 启动右键单击延迟计时器，以区分双击
+                            rightClickTimer.start()
+                            // 保存点击位置用于菜单显示
+                            centerMouseArea.lastClickGlobalPos = centerMouseArea.mapToGlobal(mouseX, mouseY)
                         }
                         return
                     }
@@ -1119,7 +1155,20 @@ Window {
                     }
                 }
                 
+                // 添加属性保存右键点击位置
+                property point lastClickGlobalPos
+
                 onDoubleClicked: {
+                    // 右键双击：触发整点报时特效 (观摩模式)
+                    // 仅在迷你模式下生效
+                    if (mouse.button === Qt.RightButton) {
+                        if (mainWindow.isPinned) {
+                            rightClickTimer.stop() // 停止单击计时器，防止弹出菜单
+                            fluxChime.trigger(true) // 手动触发，按顺序切换
+                        }
+                        return
+                    }
+
                     // 仅响应左键双击
                     if (mouse.button !== Qt.LeftButton) return
 
@@ -1142,6 +1191,19 @@ Window {
                     repeat: false
                     onTriggered: {
                         timerEngine.togglePause()
+                    }
+                }
+
+                // 右键单击延迟计时器
+                Timer {
+                    id: rightClickTimer
+                    interval: 250 // 等待 250ms 以区分双击
+                    repeat: false
+                    onTriggered: {
+                        quickMenu.x = centerMouseArea.lastClickGlobalPos.x + 10
+                        quickMenu.y = centerMouseArea.lastClickGlobalPos.y + 10
+                        quickMenu.show()
+                        quickMenu.requestActivate()
                     }
                 }
             }
@@ -1374,6 +1436,7 @@ Window {
                             var newVal = timerEngine.workDurationMinutes + delta
                             if (newVal >= 1 && newVal <= 120) {
                                 timerEngine.workDurationMinutes = newVal
+                                appConfig.workDuration = newVal // Save to config
                             }
                         }
                     }
