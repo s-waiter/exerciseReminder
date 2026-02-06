@@ -803,6 +803,7 @@ Window {
     property point clickPos: "0,0"
     
     function getCardColor(type) {
+        if (type === -1) return "#FFFFFF" // All -> White
         if (type === 0) return primaryColor
         if (type === 1) return accentColor
         if (type === 2) return dangerColor

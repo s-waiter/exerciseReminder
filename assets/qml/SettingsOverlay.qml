@@ -26,7 +26,7 @@ Item {
         id: settingsDialog
         anchors.centerIn: parent
         width: 200 
-        height: 220 
+        height: 260 // Increased height to accommodate new setting
         radius: 16 
         color: "#F01B2A4E" // 增加不透明度，提升质感
         border.color: settingsDialogMouseArea.containsMouse ? 
@@ -157,6 +157,117 @@ Item {
                             color: "white"
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on x { NumberAnimation { duration: 100 } }
+                        }
+                    }
+                }
+            }
+
+            // 间隔时长设置
+            Item {
+                width: parent.width
+                height: 20
+                
+                Text {
+                    text: "间隔时长"
+                    color: "#DDDDDD"
+                    font.pixelSize: 12
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -2
+                }
+
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 5
+                    
+                    // 减号按钮
+                    Rectangle {
+                        width: 20
+                        height: 20
+                        radius: 10
+                        color: "#33ffffff"
+                        border.color: "#66ffffff"
+                        border.width: 1
+                        
+                        Text {
+                            text: "-"
+                            color: "white"
+                            anchors.centerIn: parent
+                            font.pixelSize: 14
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (timerEngine.workDurationMinutes > 1) {
+                                    timerEngine.workDurationMinutes -= 1
+                                    appConfig.workDuration = timerEngine.workDurationMinutes
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 数值显示 (带滚轮和重置)
+                    Item {
+                        width: 45
+                        height: 20
+                        
+                        Text {
+                            anchors.centerIn: parent
+                            text: timerEngine.workDurationMinutes + " min"
+                            color: "white"
+                            font.pixelSize: 12
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            
+                            // 滚轮修改
+                            onWheel: {
+                                var delta = wheel.angleDelta.y > 0 ? 1 : -1
+                                var newVal = timerEngine.workDurationMinutes + delta
+                                if (newVal >= 1 && newVal <= 120) {
+                                    timerEngine.workDurationMinutes = newVal
+                                    appConfig.workDuration = newVal
+                                }
+                            }
+                            
+                            // 单击重置倒计时 (按当前设置的时长重新开始)
+                        onClicked: {
+                            timerEngine.startWork()
+                        }
+                        }
+                    }
+                    
+                    // 加号按钮
+                    Rectangle {
+                        width: 20
+                        height: 20
+                        radius: 10
+                        color: "#33ffffff"
+                        border.color: "#66ffffff"
+                        border.width: 1
+                        
+                        Text {
+                            text: "+"
+                            color: "white"
+                            anchors.centerIn: parent
+                            font.pixelSize: 14
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (timerEngine.workDurationMinutes < 120) {
+                                    timerEngine.workDurationMinutes += 1
+                                    appConfig.workDuration = timerEngine.workDurationMinutes
+                                }
+                            }
                         }
                     }
                 }

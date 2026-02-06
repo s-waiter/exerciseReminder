@@ -27,6 +27,11 @@ Window {
     property int snoozeMinutes: 5 // Default snooze time
     
     signal snoozeRequested(int minutes)
+    signal dismissRequested()
+    
+    function closeWindow() {
+        closeAnim.start()
+    }
     
     // Theme Colors (Cyberpunk/Neon Palette)
     readonly property color themeColor: {
@@ -435,7 +440,10 @@ Window {
                         styleColor: confirmBtn.enabled ? Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.3) : "transparent"
                     }
                     
-                    onClicked: closeAnim.start()
+                    onClicked: {
+                        console.log("Dismiss requested");
+                        root.dismissRequested()
+                    }
                 }
                 
                 // Snooze ("推迟 X 分")
@@ -485,9 +493,44 @@ Window {
                         closeAnim.start()
                     }
                     
-                    ToolTip.visible: snoozeBtn.hovered
-                    ToolTip.text: "滚动鼠标滚轮调整时间 (1-10分)"
-                    ToolTip.delay: 500
+                    ToolTip {
+                        id: snoozeTip
+                        visible: snoozeBtn.hovered
+                        delay: 500
+                        text: "滚动鼠标滚轮调整时间 (1-10分)"
+                        
+                        contentItem: Row {
+                            spacing: 8
+                            
+                            Rectangle {
+                                width: 8
+                                height: 8
+                                radius: 4
+                                color: themeColor
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            
+                            Text {
+                                text: snoozeTip.text
+                                font.pixelSize: 12
+                                font.family: "Microsoft YaHei"
+                                color: "white"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                        
+                        background: Rectangle {
+                            color: "#CC1B2A4E"
+                            border.color: "#33ffffff"
+                            border.width: 1
+                            radius: 16
+                        }
+                        
+                        topPadding: 8
+                        bottomPadding: 8
+                        leftPadding: 12
+                        rightPadding: 12
+                    }
                 }
             }
         }

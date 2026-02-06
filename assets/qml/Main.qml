@@ -43,6 +43,7 @@ Window {
 
     // Schedule Manager Windows
     // property var scheduleWin: null // Replaced by Loader
+    property var activeReminderWindows: ({}) // Map<scheduleId, List<ReminderWindow>>
 
     function openScheduleWindow() {
         if (scheduleLoader.active && scheduleLoader.item) {
@@ -77,18 +78,70 @@ Window {
                 props["forceMode"] = true
             }
             
-            var win = component.createObject(mainWindow, props)
-            
-            // Connect snooze signal
-            if (win) {
-                win.snoozeRequested.connect(function(minutes) {
-                    scheduleManager.snoozeReminder(id, minutes)
-                })
-                win.show()
-                win.requestActivate()
+            // Initialize array for this schedule ID if not exists
+            if (!activeReminderWindows[id]) {
+                activeReminderWindows[id] = []
+            }
+
+            // Create a window for EACH screen
+            var screens = Qt.application.screens
+            for (var i = 0; i < screens.length; i++) {
+                var screen = screens[i]
+                
+                // Clone props and add screen-specific properties if needed
+                // Note: ReminderWindow uses default positioning based on its own Screen attached property
+                // But we must explicitly set the 'screen' property of the Window
+                var screenProps = Object.assign({}, props)
+                screenProps["screen"] = screen
+                // Explicitly set position relative to the target screen
+                // ReminderWindow has logic: x: Screen.width - width - 30
+                // We need to ensure it uses the correct screen's dimensions
+                // Since 'screen' property is set, Screen.width inside ReminderWindow *should* be correct.
+                
+                var win = component.createObject(mainWindow, screenProps)
+                
+                if (win) {
+                    // Store reference
+                    activeReminderWindows[id].push(win)
+                    
+                    // Connect signals
+                    win.snoozeRequested.connect(function(minutes) {
+                        scheduleManager.snoozeReminder(id, minutes)
+                        closeAllReminders(id)
+                    })
+                    
+                    win.dismissRequested.connect(function() {
+                        // User clicked "I know"
+                        // Logic: Mark as completed or just close?
+                        // Usually just close. If completion logic is needed, call scheduleManager.
+                        closeAllReminders(id)
+                    })
+                    
+                    win.show()
+                    win.requestActivate()
+                }
             }
         } else {
             console.error("Error loading ReminderWindow:", component.errorString())
+        }
+    }
+    
+    function closeAllReminders(id) {
+        if (activeReminderWindows[id]) {
+            var windows = activeReminderWindows[id]
+            for (var i = 0; i < windows.length; i++) {
+                var win = windows[i]
+                if (win) {
+                    try {
+                        win.closeWindow()
+                    } catch (e) {
+                        console.log("Error closing window:", e)
+                        win.destroy() // Fallback
+                    }
+                }
+            }
+            // Clear the list
+            delete activeReminderWindows[id]
         }
     }
 
@@ -628,7 +681,7 @@ Window {
                     id: scheduleBtn
                     width: 30
                     height: 30
-                    visible: !mainWindow.isPinned
+                    visible: false // !mainWindow.isPinned (User requested removal from title bar)
                     background: Rectangle { color: "transparent" }
                     contentItem: Text {
                         text: "📅" 
@@ -1533,10 +1586,10 @@ Window {
             visible: !mainWindow.isPinned
             height: visible ? implicitHeight : 0 // 确保隐藏时不占位
                 
-                // 间隔设置卡片
+                // 提醒列表入口 (原间隔设置卡片)
                 Rectangle {
                     id: intervalCard
-                    width: 95 // 增加宽度
+                    width: 95 
                     height: 40
                     color: "#1Affffff"
                     radius: 10
@@ -1553,68 +1606,7 @@ Window {
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
                         onClicked: {
-                            hintAnim.restart()
-                            timerEngine.startWork() // 单击重置
-                        }
-                        // 支持鼠标滚轮直接调节时长
-                        onWheel: {
-                            var delta = wheel.angleDelta.y > 0 ? 1 : -1
-                            var newVal = timerEngine.workDurationMinutes + delta
-                            if (newVal >= 1 && newVal <= 120) {
-                                timerEngine.workDurationMinutes = newVal
-                                appConfig.workDuration = newVal // Save to config
-                            }
-                        }
-                    }
-
-                    // 专用提示气泡
-                    Rectangle {
-                        id: wheelHint
-                        // Width calculation: LeftPadding(12) + Indicator(8) + Spacing(8) + Text + RightPadding(12) = Text + 40
-                        width: hintText.implicitWidth + 40 
-                        height: 32
-                        radius: 16
-                        color: "#CC1B2A4E" // 半透明深色背景
-                        border.color: "#33ffffff"
-                        border.width: 1
-                        anchors.top: parent.bottom
-                        anchors.topMargin: 8
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        visible: opacity > 0
-                        opacity: 0
-                        z: 100 // 确保显示在最上层
-
-                        // 状态指示点
-                        Rectangle {
-                            id: hintIndicator
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: "#00d2ff"
-                            anchors.left: parent.left
-                            anchors.leftMargin: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        Text {
-                            id: hintText
-                            text: "鼠标滚轮修改,单击重置"
-                            color: "white"
-                            font.pixelSize: 12
-                            font.family: "Microsoft YaHei"
-                            anchors.left: hintIndicator.right
-                            anchors.leftMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        SequentialAnimation {
-                            id: hintAnim
-                            ParallelAnimation {
-                                NumberAnimation { target: wheelHint; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutQuad }
-                                NumberAnimation { target: wheelHint; property: "scale"; from: 0.9; to: 1; duration: 200; easing.type: Easing.OutBack }
-                            }
-                            PauseAnimation { duration: 2000 }
-                            NumberAnimation { target: wheelHint; property: "opacity"; to: 0; duration: 300; easing.type: Easing.InQuad }
+                            openScheduleWindow()
                         }
                     }
 
@@ -1622,20 +1614,45 @@ Window {
                         anchors.centerIn: parent
                         spacing: 2
                         
-                        Text { 
-                            property var val: timerEngine.workDurationMinutes
-                            text: (val !== undefined ? val : 45) + " min"
-                            color: "white"
-                            font.bold: true
-                            font.pixelSize: 12
-                            font.family: "Segoe UI"
-                            height: 16 // 固定高度以对齐右侧开关
-                            verticalAlignment: Text.AlignVCenter
+                        // 纯白扁平化日历图标 (Canvas绘制以匹配午休按钮风格)
+                        Item {
+                            width: 16
+                            height: 16
                             anchors.horizontalCenter: parent.horizontalCenter
+                            
+                            // 日历主体 - 缩小尺寸以视觉平衡
+                            Rectangle {
+                                width: 12
+                                height: 11
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset: 0
+                                color: "transparent"
+                                border.color: "white"
+                                border.width: 1.2 // 减细边框
+                                radius: 1.5
+                                
+                                // 日历头部 (实心)
+                                Rectangle {
+                                    width: parent.width
+                                    height: 3
+                                    color: "white"
+                                    anchors.top: parent.top
+                                    radius: 1 
+                                }
+                                
+                                // 模拟日历线条
+                                Column {
+                                    anchors.centerIn: parent
+                                    anchors.verticalCenterOffset: 2
+                                    spacing: 1.5
+                                    Rectangle { width: 6; height: 1; color: "white"; opacity: 0.8 }
+                                    Rectangle { width: 6; height: 1; color: "white"; opacity: 0.8 }
+                                }
+                            }
                         }
                         
                         Text { 
-                            text: "间隔时长"
+                            text: "提醒事项"
                             color: "#8899A6"
                             font.pixelSize: 10
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1668,14 +1685,21 @@ Window {
                         anchors.centerIn: parent
                         spacing: 2
                         
-                        Text {
-                            text: "☾" // Moon symbol
-                            color: "white"
-                            font.pixelSize: 14 // 保持与其他卡片内元素大小协调
-                            font.bold: true
+                        // 统一图标容器，确保与左侧日历图标严格对齐
+                        Item {
+                            width: 16
+                            height: 16
                             anchors.horizontalCenter: parent.horizontalCenter
-                            height: 16 // 与 intervalCard 的 text height 16 保持对齐
-                            verticalAlignment: Text.AlignVCenter
+                            
+                            Text {
+                                text: "☾"
+                                color: "white"
+                                font.pixelSize: 14
+                                font.bold: true
+                                anchors.centerIn: parent
+                                verticalAlignment: Text.AlignVCenter
+                                horizontalAlignment: Text.AlignHCenter
+                            }
                         }
                         
                         Text {
