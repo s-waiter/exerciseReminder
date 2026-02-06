@@ -18,5 +18,8 @@
         <file>assets/qml/TimeInput.qml</file>
         <file>assets/qml/ScheduleIcon.qml</file>
         <file>assets/images/tray_icon.svg</file>
+        <file>assets/qml/CustomCheckBox.qml</file>
+        <file>assets/qml/CustomComboBox.qml</file>
+        <file>assets/qml/DatePickerInput.qml</file>
     </qresource>
 </RCC>

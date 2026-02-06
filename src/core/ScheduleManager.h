@@ -46,6 +46,7 @@ public:
     Q_INVOKABLE void addSchedule(const QVariantMap& scheduleData);
     Q_INVOKABLE void updateSchedule(const QString& id, const QVariantMap& scheduleData);
     Q_INVOKABLE void removeSchedule(const QString& id);
+    Q_INVOKABLE void snoozeReminder(const QString& id, int minutes);
     Q_INVOKABLE void markPrepared(const QString& id, bool prepared);
 
     QVariantList getSchedules() const;
@@ -53,7 +54,7 @@ public:
 
 signals:
     void schedulesChanged();
-    void reminderTriggered(const QString& title, const QString& type);
+    void reminderTriggered(const QString& title, int type, const QString& message, const QString& id, const QVariantMap& options);
 
 private:
     void loadSchedules();

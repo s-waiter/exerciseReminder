@@ -63,6 +63,28 @@ Window {
     property string currentId: ""
     property bool isEditMode: false
     property bool isCreatePanelOpen: false // Controls the Side Panel
+    property var editingData: null // Store original data for updates
+
+    // Filter Logic
+    property var filteredSchedules: {
+        var list = scheduleManager.schedules
+        if (filterType === -1) return list
+        var res = []
+        for(var i=0; i<list.length; i++) {
+            if(list[i].type === filterType) res.push(list[i])
+        }
+        return res
+    }
+
+    function getCount(type) {
+        var list = scheduleManager.schedules
+        if (type === -1) return list.length
+        var c = 0
+        for(var i=0; i<list.length; i++) {
+            if(list[i].type === type) c++
+        }
+        return c
+    }
 
     // ========================================================================
     // Background & Window Frame
@@ -164,14 +186,25 @@ Window {
                                 Repeater {
                                     model: ["全部", "工作", "生活", "纪念", "健康"]
                                     Rectangle {
-                                        width: 60; height: 32; radius: 16
-                                        color: (index - 1) === filterType ? primaryColor : "transparent"
-                                        border.color: (index - 1) === filterType ? primaryColor : borderColor
+                                        property color currentColor: root.getCardColor(index - 1)
+                                        property bool isSelected: (index - 1) === filterType
+
+                                        width: 60 + (countText.width > 0 ? 10 : 0); height: 32; radius: 16
+                                        color: isSelected ? Qt.rgba(currentColor.r, currentColor.g, currentColor.b, 0.2) : "transparent"
+                                        border.color: isSelected ? currentColor : borderColor
+                                        
+                                        // Levitation Effect on Selection
+                                        transform: Translate {
+                                            y: isSelected ? -2 : 0
+                                            Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                        }
+
                                         Text { 
-                                            text: modelData
+                                            id: countText
+                                            text: modelData + " (" + getCount(index - 1) + ")"
                                             anchors.centerIn: parent
-                                            color: (index - 1) === filterType ? "#141E30" : secondaryTextColor 
-                                            font.bold: (index - 1) === filterType
+                                            color: parent.isSelected ? parent.currentColor : secondaryTextColor 
+                                            font.bold: parent.isSelected
                                         }
                                         MouseArea {
                                             anchors.fill: parent
@@ -184,14 +217,27 @@ Window {
                             
                             // Add Button
                             Button {
+                                id: createBtn
                                 text: "+ 新建提醒"
                                 Layout.preferredWidth: 120
                                 Layout.preferredHeight: 40
+                                
+                                // Levitation Effect on Hover
+                                transform: Translate {
+                                    y: createBtn.hovered ? -4 : 0
+                                    Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                }
+
                                 background: Rectangle {
                                     gradient: Gradient { GradientStop { position: 0.0; color: primaryColor } GradientStop { position: 1.0; color: "#007acc" } }
                                     radius: 20
                                     layer.enabled: true
-                                    layer.effect: Glow { color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.4); radius: 10; samples: 10 }
+                                    layer.effect: Glow { 
+                                        color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.4)
+                                        radius: createBtn.hovered ? 15 : 10 
+                                        samples: 10 
+                                        Behavior on radius { NumberAnimation { duration: 200 } }
+                                    }
                                 }
                                 contentItem: Text { text: parent.text; color: "#141E30"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                 onClicked: openCreate()
@@ -203,8 +249,17 @@ Window {
                                 text: "×"
                                 font.pixelSize: 32
                                 color: secondaryTextColor
+                                
+                                // Levitation Effect on Hover
+                                transform: Translate {
+                                    y: closeBtnMouse.containsMouse ? -2 : 0
+                                    Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                }
+
                                 MouseArea {
+                                    id: closeBtnMouse
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: root.close()
                                 }
@@ -247,13 +302,13 @@ Window {
                             cellHeight: 180
                             clip: true
                             
-                            model: scheduleManager.schedules
+                            model: filteredSchedules
                             
                             delegate: Loader {
                                 width: gridView.cellWidth
                                 height: gridView.cellHeight
-                                active: filterType === -1 || modelData.type === filterType
-                                visible: active
+                                active: true // Filter handled by model
+                                visible: true
                                 
                                 sourceComponent: Rectangle {
                                     anchors.fill: parent
@@ -385,8 +440,17 @@ Window {
                             text: "×"
                             font.pixelSize: 28
                             color: secondaryTextColor
+                            
+                            // Levitation Effect on Hover
+                            transform: Translate {
+                                y: drawerCloseBtnMouse.containsMouse ? -2 : 0
+                                Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            }
+
                             MouseArea {
+                                id: drawerCloseBtnMouse
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: closeDrawer()
                             }
@@ -423,7 +487,7 @@ Window {
                     }
 
                     // 3. Time
-                    ColumnLayout {
+                    RowLayout {
                         spacing: 12
                         Label { text: "时间"; color: secondaryTextColor; font.pixelSize: 14 }
                         RowLayout {
@@ -432,6 +496,9 @@ Window {
                             Rectangle {
                                 width: 80; height: 60; radius: 12; color: Qt.rgba(0,0,0,0.2)
                                 border.color: hourInput.activeFocus ? primaryColor : "transparent"
+                                border.width: hourInput.activeFocus ? 1 : 0
+                                layer.enabled: hourInput.activeFocus
+                                layer.effect: Glow { color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.5); radius: 10; samples: 16 }
                                 TimeInput { id: hourInput; max: 23; onNext: minuteInput.forceActiveFocus(); anchors.centerIn: parent; font.pixelSize: 32 }
                             }
                             Text { text: ":"; color: secondaryTextColor; font.pixelSize: 32; font.bold: true }
@@ -439,7 +506,10 @@ Window {
                             Rectangle {
                                 width: 80; height: 60; radius: 12; color: Qt.rgba(0,0,0,0.2)
                                 border.color: minuteInput.activeFocus ? primaryColor : "transparent"
-                                TimeInput { id: minuteInput; max: 59; onNext: saveSchedule(); anchors.centerIn: parent; font.pixelSize: 32 }
+                                border.width: minuteInput.activeFocus ? 1 : 0
+                                layer.enabled: minuteInput.activeFocus
+                                layer.effect: Glow { color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.5); radius: 10; samples: 16 }
+                                TimeInput { id: minuteInput; max: 59; onNext: minuteInput.focus = false; anchors.centerIn: parent; font.pixelSize: 32 }
                             }
                         }
                     }
@@ -488,8 +558,23 @@ Window {
                                     Rectangle {
                                         width: 36; height: 36; radius: 18
                                         color: weeklyModel.days[index] ? primaryColor : "transparent"
-                                        border.color: weeklyModel.days[index] ? primaryColor : borderColor
-                                        Text { text: modelData; anchors.centerIn: parent; color: parent.color === "transparent" ? secondaryTextColor : "#141E30" }
+                                        border.color: weeklyModel.days[index] ? primaryColor : Qt.rgba(255, 255, 255, 0.2)
+                                        border.width: 1
+                                        
+                                        // Glow effect when selected
+                                        layer.enabled: weeklyModel.days[index]
+                                        layer.effect: Glow {
+                                            color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.5)
+                                            radius: 8
+                                            samples: 16
+                                        }
+
+                                        Text { 
+                                            text: modelData
+                                            anchors.centerIn: parent
+                                            color: weeklyModel.days[index] ? "#141E30" : "#d0d0d0"
+                                            font.bold: weeklyModel.days[index]
+                                        }
                                         MouseArea {
                                             anchors.fill: parent; onClicked: weeklyModel.toggle(index)
                                             cursorShape: Qt.PointingHandCursor
@@ -509,11 +594,11 @@ Window {
                         RowLayout {
                             visible: freqLogic.currentTab === 3
                             spacing: 10
-                            CheckBox {
+                            CustomCheckBox {
                                 id: lastDayCheck
                                 text: "最后一天"
                                 checked: false
-                                contentItem: Text { text: parent.text; color: textColor; leftPadding: parent.indicator.width + 4 }
+                                checkedColor: primaryColor
                             }
                             ModernTextField {
                                 id: dayOfMonthInput
@@ -521,6 +606,7 @@ Window {
                                 placeholderText: "几号 (1-31)"
                                 implicitWidth: 100
                                 validator: IntValidator { bottom: 1; top: 31 }
+                                enableWheel: true
                             }
                         }
 
@@ -529,16 +615,28 @@ Window {
                             visible: freqLogic.currentTab === 4
                             spacing: 10
                             RowLayout {
-                                ModernTextField { id: monthInput; placeholderText: "月"; implicitWidth: 60; validator: IntValidator{bottom:1; top:12} }
+                                ModernTextField {
+                                    id: monthInput
+                                    placeholderText: "月"
+                                    implicitWidth: 60
+                                    validator: IntValidator { bottom: 1; top: 12 }
+                                    enableWheel: true
+                                }
                                 Text { text: "-"; color: secondaryTextColor }
-                                ModernTextField { id: dayInput; placeholderText: "日"; implicitWidth: 60; validator: IntValidator{bottom:1; top:31} }
+                                ModernTextField {
+                                    id: dayInput
+                                    placeholderText: "日"
+                                    implicitWidth: 60
+                                    validator: IntValidator { bottom: 1; top: 31 }
+                                    enableWheel: true
+                                }
                             }
                             RowLayout {
-                                CheckBox {
+                                CustomCheckBox {
                                     id: advanceCheck
                                     text: "提前提醒"
                                     checked: false
-                                    contentItem: Text { text: parent.text; color: textColor; leftPadding: parent.indicator.width + 4 }
+                                    checkedColor: primaryColor
                                 }
                                 ModernTextField {
                                     id: advanceDaysInput
@@ -546,6 +644,8 @@ Window {
                                     placeholderText: "天数"
                                     implicitWidth: 60
                                     text: "7"
+                                    validator: IntValidator { bottom: 1; top: 365 }
+                                    enableWheel: true
                                 }
                                 Text { text: "天"; color: secondaryTextColor; visible: advanceCheck.checked }
                             }
@@ -557,21 +657,26 @@ Window {
                             spacing: 10
                             RowLayout {
                                 Text { text: "每"; color: secondaryTextColor }
-                                ModernTextField { id: intervalInput; text: "2"; implicitWidth: 40; validator: IntValidator { bottom: 1; top: 99 } }
-                                ComboBox {
+                                ModernTextField {
+                                    id: intervalInput
+                                    text: "2"
+                                    implicitWidth: 40
+                                    validator: IntValidator { bottom: 1; top: 99 }
+                                    enableWheel: true
+                                }
+                                CustomComboBox {
                                     id: intervalUnit
                                     model: ["周", "天"]
                                     currentIndex: 0
+                                    implicitWidth: 80
                                 }
                             }
                             RowLayout {
                                 Label { text: "从"; color: secondaryTextColor }
-                                ModernTextField {
+                                DatePickerInput {
                                     id: startDateInput
-                                    placeholderText: "yyyy-MM-dd"
                                     implicitWidth: 120
                                     text: Qt.formatDate(new Date(), "yyyy-MM-dd")
-                                    validator: RegExpValidator { regExp: /^\d{4}-\d{2}-\d{2}$/ }
                                 }
                                 Label { 
                                     text: root.getWeekDay(startDateInput.text)
@@ -583,11 +688,11 @@ Window {
                         // Prepared Check
                         RowLayout {
                             visible: currentId !== "" && typeField.currentType === 2 && freqLogic.currentTab === 4
-                            CheckBox {
+                            CustomCheckBox {
                                 id: preparedCheck
                                 text: "今年礼物已准备 (不再提醒)"
                                 checked: false
-                                contentItem: Text { text: parent.text; color: healthColor; leftPadding: parent.indicator.width + 4 }
+                                checkedColor: healthColor
                             }
                         }
                     }
@@ -618,25 +723,57 @@ Window {
                         Item { Layout.fillWidth: true; visible: currentId === "" } // Spacer if no delete button
                         
                         Button {
+                            id: cancelBtn
                             text: "取消"
                             visible: currentId === "" || true
                             Layout.preferredWidth: 100
                             Layout.preferredHeight: 44
-                            background: Rectangle { color: "transparent"; border.color: borderColor; radius: 12 }
+                            
+                            // Levitation Effect on Hover
+                            transform: Translate {
+                                y: cancelBtn.hovered ? -4 : 0
+                                Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            }
+
+                            background: Rectangle { 
+                                color: "transparent" 
+                                border.color: borderColor 
+                                radius: 12 
+                                
+                                layer.enabled: cancelBtn.hovered
+                                layer.effect: Glow {
+                                    color: Qt.rgba(255, 255, 255, 0.2)
+                                    radius: 10
+                                    samples: 10
+                                }
+                            }
                             contentItem: Text { text: parent.text; color: secondaryTextColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             onClicked: closeDrawer()
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
                         }
 
                         Button {
+                            id: saveBtn
                             text: "保存设置"
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
+                            
+                            // Levitation Effect on Hover
+                            transform: Translate {
+                                y: saveBtn.hovered ? -4 : 0
+                                Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            }
+
                             background: Rectangle {
                                 gradient: Gradient { GradientStop { position: 0.0; color: primaryColor } GradientStop { position: 1.0; color: "#007acc" } }
                                 radius: 12
                                 layer.enabled: true
-                                layer.effect: Glow { color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.4); radius: 10; samples: 10 }
+                                layer.effect: Glow { 
+                                    color: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, 0.4)
+                                    radius: saveBtn.hovered ? 15 : 10 
+                                    samples: 10 
+                                    Behavior on radius { NumberAnimation { duration: 200 } }
+                                }
                             }
                             contentItem: Text { text: parent.text; color: "#141E30"; font.bold: true; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             onClicked: saveSchedule()
@@ -719,6 +856,7 @@ Window {
     function openEdit(data) {
         resetEdit() // Clear previous state
         currentId = data.id
+        editingData = data // Store full data object
         titleField.text = data.title
         typeField.currentType = data.type
         
@@ -731,12 +869,7 @@ Window {
         var rule = data.repeatRule || {}
         
         if (data.repeatType === 2) { // Weekly
-            var uiDays = [false,false,false,false,false,false,false]
             var days = rule.days || []
-            for(var i=0; i<days.length; i++) {
-                var wd = days[i]
-                if (wd >= 1 && wd <= 7) uiDays[wd-1] = true
-            }
             weeklyModel.set(days.map(function(d){return d-1}))
         } else if (data.repeatType === 3) { // Monthly
             lastDayCheck.checked = (rule.day === -1)
@@ -758,6 +891,7 @@ Window {
     
     function resetEdit() {
         currentId = ""
+        editingData = null
         titleField.text = ""
         typeField.currentType = 0
         hourInput.text = "09"
@@ -830,14 +964,16 @@ Window {
         }
 
         var data = {
+            id: currentId, // Preserve ID
             title: titleField.text,
             type: typeField.currentType,
             time: now,
-            enabled: true,
+            enabled: editingData ? editingData.enabled : true, // Preserve enabled state
             repeatType: freqLogic.currentTab,
             repeatRule: repeatRule,
             advanceDays: (advanceCheck.checked ? parseInt(advanceDaysInput.text) : 0),
-            isPrepared: preparedCheck.checked
+            isPrepared: preparedCheck.checked,
+            lastTriggered: editingData ? editingData.lastTriggered : undefined // Preserve lastTriggered
         }
         
         if (currentId) {

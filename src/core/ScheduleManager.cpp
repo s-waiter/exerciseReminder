@@ -138,6 +138,37 @@ void ScheduleManager::removeSchedule(const QString& id)
     }
 }
 
+void ScheduleManager::snoozeReminder(const QString& id, int minutes)
+{
+    QString title = "稍后提醒";
+    int type = 0;
+    
+    // Try to find original to copy details
+    for (const auto& item : m_schedules) {
+        if (item.id == id) {
+            title = item.title + " (延后)";
+            type = item.type;
+            break;
+        }
+    }
+    
+    QDateTime current = QDateTime::currentDateTime();
+    QDateTime snoozeTime = current.addSecs(minutes * 60);
+    
+    QVariantMap newSched;
+    newSched["title"] = title;
+    newSched["type"] = type;
+    newSched["time"] = snoozeTime.time();
+    newSched["enabled"] = true;
+    newSched["repeatType"] = 0; // Once
+    
+    QVariantMap rule;
+    rule["date"] = snoozeTime.date().toString(Qt::ISODate);
+    newSched["repeatRule"] = rule;
+    
+    addSchedule(newSched);
+}
+
 void ScheduleManager::markPrepared(const QString& id, bool prepared)
 {
     for (int i = 0; i < m_schedules.size(); ++i) {
@@ -188,9 +219,16 @@ void ScheduleManager::checkSchedules()
             
             // For now, isDue returns true for both.
             // Trigger!
-            emit reminderTriggered(item.title, QString::number(item.type));
+            QVariantMap options;
+            // options["forceMode"] = item.forceMode; // Future extension
+            emit reminderTriggered(item.title, item.type, "时间到了！", item.id, options);
             item.lastTriggered = current;
             changed = true;
+            
+            // Auto-disable "Once" schedules after triggering
+            if (item.repeatType == 0) {
+                item.enabled = false;
+            }
             
             // If it is the actual day of anniversary (not advance), reset isPrepared for next year
             if (item.repeatType == 4) {
@@ -220,13 +258,15 @@ bool ScheduleManager::isDue(const ScheduleItem& item, const QDateTime& current)
 
     switch (item.repeatType) {
     case 0: // Once
-        // For "Once", we assume the date was stored? Or just today?
-        // Usually "Once" needs a specific date. 
-        // For this simple implementation, let's say "Once" disables itself after trigger.
-        // But we lack a "date" field in ScheduleItem for "Once". 
-        // Let's assume "Once" means "Today only" or "Next occurrence".
-        // If it's enabled and time matches, trigger and disable.
+    {
+        // Support date-specific "Once" (e.g. Snooze)
+        QString dateStr = item.repeatRule.value("date").toString();
+        if (!dateStr.isEmpty()) {
+             QDate targetDate = QDate::fromString(dateStr, Qt::ISODate);
+             if (targetDate.isValid() && targetDate != today) return false;
+        }
         return true; 
+    } 
         
     case 1: // Daily
         return true;

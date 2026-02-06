@@ -25,10 +25,25 @@ Item {
     property int currentYear: currentDate.getFullYear()
 
     onCurrentDateChanged: {
-        currentMonth = currentDate.getMonth()
-        currentYear = currentDate.getFullYear()
-        selectedDate = currentDate
-        refreshCalendar()
+        // Only update if actually different to avoid loops
+        if (currentDate.getMonth() !== currentMonth || currentDate.getFullYear() !== currentYear) {
+            currentMonth = currentDate.getMonth()
+            currentYear = currentDate.getFullYear()
+            refreshCalendar()
+        }
+    }
+
+    onSelectedDateChanged: {
+        // When selected date changes externally, update the view to show that month
+        if (selectedDate.getFullYear() !== currentYear || selectedDate.getMonth() !== currentMonth) {
+            currentMonth = selectedDate.getMonth()
+            currentYear = selectedDate.getFullYear()
+            // Don't modify currentDate here to avoid circular binding
+            refreshCalendar()
+        } else {
+             // Just refresh grid highlight
+             refreshCalendar()
+        }
     }
     
     function setDate(date) {
@@ -234,17 +249,21 @@ Item {
                     width: calendarGrid.cellWidth
                     height: calendarGrid.cellHeight
                     
+                    property var dateObj: model.date
+                    
                     property bool isSelected: {
-                        return model.date.getDate() === selectedDate.getDate() && 
-                               model.date.getMonth() === selectedDate.getMonth() && 
-                               model.date.getFullYear() === selectedDate.getFullYear()
+                        if (!dateObj || !selectedDate) return false
+                        return dateObj.getDate() === selectedDate.getDate() && 
+                               dateObj.getMonth() === selectedDate.getMonth() && 
+                               dateObj.getFullYear() === selectedDate.getFullYear()
                     }
                     
                     property bool isToday: {
                         var today = new Date()
-                        return model.date.getDate() === today.getDate() && 
-                               model.date.getMonth() === today.getMonth() && 
-                               model.date.getFullYear() === today.getFullYear()
+                        if (!dateObj) return false
+                        return dateObj.getDate() === today.getDate() && 
+                               dateObj.getMonth() === today.getMonth() && 
+                               dateObj.getFullYear() === today.getFullYear()
                     }
                     
                     property bool hasData: {
@@ -292,16 +311,13 @@ Item {
                             visible: hasData
                             opacity: isSelected ? 0.8 : 1.0
                         }
-                    }
-                    
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            selectedDate = model.date
-                            dateSelected(selectedDate)
-                            // Just update local selection visually immediately
-                            calendarGrid.forceLayout()
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                dateSelected(model.date)
+                            }
                         }
                     }
                 }

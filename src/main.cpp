@@ -168,11 +168,11 @@ int main(int argc, char *argv[])
                      &scheduleManager, &ScheduleManager::checkSchedules);
 
     // 当日程触发提醒时，通过托盘图标弹出气泡通知
-    QObject::connect(&scheduleManager, &ScheduleManager::reminderTriggered,
-                     &trayIcon, [&](const QString& title, const QString& /*type*/){
-        // 根据类型（虽然目前未深度使用类型）显示通知
-        trayIcon.showMessage("日程提醒", title);
-    });
+    // QObject::connect(&scheduleManager, &ScheduleManager::reminderTriggered,
+    //                  &trayIcon, [&](const QString& title, const QString& /*type*/){
+    //     // 根据类型（虽然目前未深度使用类型）显示通知
+    //     trayIcon.showMessage("日程提醒", title);
+    // });
 
     // ========================================================================
     // 5. 初始化 QML 引擎 (前端加载)

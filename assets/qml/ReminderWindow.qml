@@ -2,14 +2,19 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtGraphicalEffects 1.15
+import QtQuick.Layouts 1.15
 import QtQuick.Particles 2.0
 
 Window {
-    id: reminderWin
-    width: Screen.width
-    height: Screen.height
-    // Ensure it covers everything
-    flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+    id: root
+    width: 420
+    height: 140 // Compact height
+    
+    // Position: Top Right (Default) - calculated in Component.onCompleted
+    x: Screen.width - width - 30
+    y: 30
+    
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
     visible: false
     
@@ -18,307 +23,493 @@ Window {
     property int type: 0 // 0:Work, 1:Life, 2:Anniversary, 3:Health
     property string scheduleId: ""
     property bool forceMode: false
-    property int forceDuration: 30 // Seconds
+    property int forceDuration: 30
+    property int snoozeMinutes: 5 // Default snooze time
     
-    // Background color based on type
-    readonly property color bgColor: {
+    signal snoozeRequested(int minutes)
+    
+    // Theme Colors (Cyberpunk/Neon Palette)
+    readonly property color themeColor: {
         switch(type) {
-            case 0: return "#1A1A2E"; // Work: Dark Blue
-            case 1: return "#FFF3E0"; // Life: Warm Orange/Beige
-            case 2: return "#2E0010"; // Anniversary: Dark Pink/Red
-            case 3: return "#E0F7FA"; // Health: Light Cyan
-            default: return "#000000";
+            case 0: return "#00d2ff"; // Cyan (Work)
+            case 1: return "#00ff88"; // Neon Green (Life)
+            case 2: return "#ff0055"; // Neon Pink (Anniversary)
+            case 3: return "#ff9500"; // Neon Orange (Health)
+            default: return "#ffffff";
         }
     }
     
-    // Text color
-    readonly property color textColor: {
-        switch(type) {
-            case 0: return "#FFFFFF";
-            case 1: return "#5D4037";
-            case 2: return "#FFD1DC";
-            case 3: return "#006064";
-            default: return "#FFFFFF";
-        }
+    // Auto-close timer REMOVED as per user request (Persistence required)
+    /*
+    Timer {
+        id: autoCloseTimer
+        interval: 10000 // 10 seconds auto dismiss if not forced
+        running: !forceMode && !hoverHandler.hovered
+        onTriggered: closeAnim.start()
     }
-
-    Rectangle {
-        id: bgRect
-        anchors.fill: parent
-        color: bgColor
-        opacity: 0.0
-        
-        Behavior on opacity { NumberAnimation { duration: 500 } }
-        
-        Component.onCompleted: opacity = 0.95
-    }
-
-    // 1. Anniversary Particles (Heart shapes)
-    ParticleSystem {
-        id: heartSys
-        anchors.fill: parent
-        running: type === 2 && reminderWin.visible
-        
-        ItemParticle {
-            delegate: Text {
-                text: "❤"
-                font.pixelSize: 40
-                color: "#FF4081"
-            }
-            fade: true
-        }
-        
-        Emitter {
-            anchors.fill: parent
-            emitRate: 10
-            lifeSpan: 4000
-            size: 24
-            sizeVariation: 8
-            velocity: AngleDirection { angle: 90; angleVariation: 360; magnitude: 50 }
-        }
+    */
+    
+    // Entry Animation
+    Component.onCompleted: {
+        showAnim.start()
     }
     
-    // 2. Health: Water Animation (Simplified as rising blue rect)
-    Rectangle {
-        id: waterRect
-        width: 300
-        height: 0
-        color: "#00B0FF"
-        anchors.bottom: contentCol.top
-        anchors.bottomMargin: 40
-        anchors.horizontalCenter: parent.horizontalCenter
-        visible: type === 3 && titleStr.indexOf("喝水") >= 0 && reminderWin.visible
-        opacity: 0.6
-        radius: 20
-        
-        SequentialAnimation {
-            running: waterRect.visible
-            loops: Animation.Infinite
-            NumberAnimation { target: waterRect; property: "height"; from: 20; to: 300; duration: 2000; easing.type: Easing.InOutQuad }
-            NumberAnimation { target: waterRect; property: "height"; from: 300; to: 20; duration: 2000; easing.type: Easing.InOutQuad }
-        }
-        
-        Text {
-            anchors.centerIn: parent
-            text: "💧"
-            font.pixelSize: 60
-        }
+    ParallelAnimation {
+        id: showAnim
+        NumberAnimation { target: mainCard; property: "opacity"; from: 0; to: 1; duration: 400; easing.type: Easing.OutCubic }
+        NumberAnimation { target: mainCard; property: "x"; from: 50; to: 0; duration: 400; easing.type: Easing.OutBack; easing.overshoot: 0.8 }
     }
-
-    Column {
-        id: contentCol
-        anchors.centerIn: parent
-        spacing: 30
+    
+    SequentialAnimation {
+        id: closeAnim
+        NumberAnimation { target: mainCard; property: "opacity"; to: 0; duration: 300 }
+        ScriptAction { script: root.destroy() }
+    }
+    
+    // Main Card Container
+    Item {
+        id: mainCard
+        anchors.fill: parent
+        opacity: 0 // Start hidden
         
-        Text {
-            text: titleStr
-            font.pixelSize: 56
-            font.bold: true
-            color: textColor
-            anchors.horizontalCenter: parent.horizontalCenter
-            style: Text.Outline
-            styleColor: Qt.rgba(0,0,0,0.2)
-        }
-        
-        Text {
-            text: messageStr
-            font.pixelSize: 28
-            color: textColor
-            anchors.horizontalCenter: parent.horizontalCenter
-            horizontalAlignment: Text.AlignHCenter
-            width: 800
-            wrapMode: Text.WordWrap
-        }
-        
-        // Health: Eye Exercise Placeholder
+        // 1. Glass Background
         Rectangle {
-            width: 640
-            height: 360
-            color: "black"
-            visible: type === 3 && titleStr.indexOf("眼保健操") >= 0
-            border.color: "white"
-            border.width: 2
+            id: bgRect
+            anchors.fill: parent
+            radius: 16
+            color: Qt.rgba(20/255, 30/255, 48/255, 0.85) // Dark semi-transparent
+            border.color: Qt.rgba(255, 255, 255, 0.1)
+            border.width: 1
             
-            Text {
-                anchors.centerIn: parent
-                text: "（模拟：此处播放眼保健操动画）\n请跟随节奏转动眼球 🙄"
-                color: "white"
-                font.pixelSize: 24
-                horizontalAlignment: Text.AlignHCenter
+            // Frosted Glass Simulation (Blur behind is hard in overlay, so we fake it with noise/gradient)
+            layer.enabled: true
+            layer.effect: DropShadow {
+                transparentBorder: true
+                horizontalOffset: 0
+                verticalOffset: 8
+                radius: 24
+                samples: 20
+                color: "#80000000"
             }
             
-            // Simple animation for eyes
-            Row {
-                anchors.centerIn: parent
-                spacing: 40
-                visible: true
-                Repeater {
-                    model: 2
-                    Rectangle {
-                        width: 60; height: 60; radius: 30
-                        color: "white"
-                        Rectangle {
-                            width: 20; height: 20; radius: 10
-                            color: "black"
-                            x: 20; y: 20
-                            SequentialAnimation {
-                                running: true
-                                loops: Animation.Infinite
-                                NumberAnimation { property: "x"; to: 40; duration: 1000 } // Right
-                                NumberAnimation { property: "y"; to: 40; duration: 1000 } // Down
-                                NumberAnimation { property: "x"; to: 0; duration: 1000 } // Left
-                                NumberAnimation { property: "y"; to: 0; duration: 1000 } // Up
-                                NumberAnimation { property: "x"; to: 20; duration: 1000 } // Center
-                                PauseAnimation { duration: 1000 }
-                            }
+            // Gradient Sheen
+            Rectangle {
+                anchors.fill: parent
+                radius: 16
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(255,255,255,0.05) }
+                    GradientStop { position: 0.4; color: "transparent" }
+                }
+            }
+        }
+        
+        // 2. Glowing Accent Border (Left Side)
+        Rectangle {
+            width: 4
+            height: parent.height - 32
+            anchors.left: parent.left
+            anchors.leftMargin: 1
+            anchors.verticalCenter: parent.verticalCenter
+            radius: 2
+            color: themeColor
+            
+            layer.enabled: true
+            layer.effect: Glow {
+                radius: 8
+                samples: 16
+                color: themeColor
+                spread: 0.5
+            }
+        }
+
+        // ========================================================================
+        // 2.0 Work: Digital Flow / Matrix Rain (Type 0)
+        // ========================================================================
+        Item {
+            anchors.fill: parent
+            visible: type === 0
+            clip: true
+            z: 0
+            
+            ParticleSystem {
+                id: workSys
+                anchors.fill: parent
+                running: parent.visible
+                
+                // Digital Bits
+                ItemParticle {
+                    delegate: Rectangle {
+                        width: Math.random() * 4 + 2
+                        height: width
+                        color: "#00d2ff"
+                        opacity: 0.6
+                        radius: 1
+                    }
+                }
+
+                // Horizontal Flow (Data Streams)
+                Emitter {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 1; height: parent.height
+                    emitRate: 20
+                    lifeSpan: 2000
+                    size: 4
+                    velocity: AngleDirection { angle: 0; magnitude: 150; magnitudeVariation: 50 }
+                    acceleration: PointDirection { x: 50 }
+                }
+            }
+        }
+
+        // ========================================================================
+        // 2.1 Life: Floating Bubbles / Fireflies (Type 1)
+        // ========================================================================
+        Item {
+            anchors.fill: parent
+            visible: type === 1
+            clip: true
+            z: 0
+            
+            ParticleSystem {
+                id: lifeSys
+                anchors.fill: parent
+                running: parent.visible
+                
+                ItemParticle {
+                    delegate: Rectangle {
+                        width: 8; height: 8
+                        radius: 4
+                        color: "#00ff88"
+                        opacity: 0.4
+                    }
+                }
+                
+                Emitter {
+                    anchors.fill: parent
+                    emitRate: 10
+                    lifeSpan: 4000
+                    size: 8
+                    sizeVariation: 4
+                    velocity: AngleDirection { angle: -90; angleVariation: 180; magnitude: 10 }
+                }
+                
+                Wander {
+                    xVariance: 50
+                    yVariance: 50
+                    pace: 20
+                }
+            }
+        }
+
+        // ========================================================================
+        // 2.2 Anniversary: Celebration Ribbons & Sparkles (Type 2)
+        // ========================================================================
+        Item {
+            anchors.fill: parent
+            visible: type === 2
+            clip: false 
+            z: 0 
+            
+            ParticleSystem {
+                id: particleSys
+                anchors.fill: parent
+                running: parent.visible
+                
+                // Confetti Strips
+                ItemParticle {
+                    id: ribbonParticle
+                    groups: ["ribbons"]
+                    delegate: Rectangle {
+                        width: Math.random() > 0.5 ? 8 : 4
+                        height: Math.random() > 0.5 ? 4 : 12 
+                        color: {
+                            var colors = ["#ff0055", "#ffcc00", "#00d2ff", "#ffffff", "#ff00ff"];
+                            return colors[Math.floor(Math.random() * colors.length)];
+                        }
+                        radius: 2
+                        opacity: 0.9
+                    }
+                }
+                
+                // Sparkles (New!)
+                ItemParticle {
+                    groups: ["sparkles"]
+                    delegate: Rectangle {
+                        width: 3; height: 3
+                        color: "#ffffff"
+                        opacity: 0
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 1; duration: 200 }
+                            NumberAnimation { to: 0; duration: 200 }
                         }
                     }
                 }
+                
+                // Ribbon Emitter
+                Emitter {
+                    group: "ribbons"
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: -10
+                    width: parent.width
+                    height: 20
+                    emitRate: 30 
+                    lifeSpan: 3500
+                    lifeSpanVariation: 500
+                    size: 8
+                    sizeVariation: 4
+                    velocity: AngleDirection { angle: -90; angleVariation: 60; magnitude: 60; magnitudeVariation: 30 }
+                    acceleration: PointDirection { y: 30 }
+                }
+                
+                // Sparkle Emitter
+                Emitter {
+                    group: "sparkles"
+                    anchors.fill: parent
+                    emitRate: 20
+                    lifeSpan: 1000
+                    size: 4
+                }
+                
+                Wander {
+                    groups: ["ribbons"]
+                    xVariance: 20
+                    pace: 100
+                }
+            }
+        }
+
+        // ========================================================================
+        // 2.3 Health: Vitality Pulse (Type 3)
+        // ========================================================================
+        Item {
+            anchors.fill: parent
+            visible: type === 3
+            z: -1 // Deep background
+            
+            // Pulsing Background Gradient
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.8
+                height: parent.height * 0.8
+                radius: width / 2
+                color: Qt.rgba(1, 0.5, 0, 0.15) // Orange tint
+                
+                SequentialAnimation on scale {
+                    running: type === 3
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 1.5; duration: 2000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutSine }
+                }
+                SequentialAnimation on opacity {
+                    running: type === 3
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.3; duration: 2000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 0.1; duration: 2000; easing.type: Easing.InOutSine }
+                }
+            }
+            
+            // Border Breathing
+            SequentialAnimation {
+                running: type === 3
+                loops: Animation.Infinite
+                ColorAnimation { target: bgRect; property: "border.color"; from: Qt.rgba(255, 255, 255, 0.1); to: themeColor; duration: 2000; easing.type: Easing.InOutSine }
+                ColorAnimation { target: bgRect; property: "border.color"; from: themeColor; to: Qt.rgba(255, 255, 255, 0.1); duration: 2000; easing.type: Easing.InOutSine }
             }
         }
         
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 20
+        // 3. Content Layout
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 16
             
-            // "Prepared" Button (Only for Anniversary)
-            Button {
-                visible: type === 2 // Anniversary
-                text: "🎁 已准备礼物"
-                font.pixelSize: 22
-                font.bold: true
+            // Icon
+            Rectangle {
+                width: 48; height: 48
+                radius: 24
+                color: Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.2)
+                border.color: Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.5)
                 
-                contentItem: Text {
-                    text: parent.text
-                    font: parent.font
-                    opacity: enabled ? 1.0 : 0.3
-                    color: "#880E4F"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                background: Rectangle {
-                    implicitWidth: 200
-                    implicitHeight: 60
-                    opacity: enabled ? 1 : 0.3
-                    color: "#FFD1DC"
-                    radius: 30
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        transparentBorder: true
-                        horizontalOffset: 2
-                        verticalOffset: 2
-                        color: "#40000000"
+                Text {
+                    anchors.centerIn: parent
+                    text: {
+                        switch(type) {
+                            case 0: return "💼";
+                            case 1: return "🏠";
+                            case 2: return "🎂";
+                            case 3: return "💊";
+                            default: return "📅";
+                        }
                     }
+                    font.pixelSize: 24
                 }
                 
-                onClicked: {
-                    scheduleManager.setPrepared(scheduleId, true)
-                    bgRect.opacity = 0
-                    closeTimer.start()
+                // Pulse Animation
+                SequentialAnimation on scale {
+                    loops: Animation.Infinite
+                    running: true
+                    NumberAnimation { to: 1.1; duration: 1000; easing.type: Easing.InOutQuad }
+                    NumberAnimation { to: 1.0; duration: 1000; easing.type: Easing.InOutQuad }
                 }
             }
-
-            Button {
-                text: (forceMode && forceDuration > 0) ? "请完成任务..." : "完成 / 关闭"
-                font.pixelSize: 22
-                font.bold: true
-                enabled: !(forceMode && forceDuration > 0)
+            
+            // Text Info
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 4
                 
-                contentItem: Text {
-                    text: parent.text
-                    font: parent.font
-                    opacity: enabled ? 1.0 : 0.3
-                    color: type === 1 ? "#3E2723" : "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                Text {
+                    text: titleStr
+                    color: "#ffffff"
+                    font.pixelSize: 18
+                    font.bold: true
+                    font.family: "Microsoft YaHei UI"
                     elide: Text.ElideRight
-                }
-
-                background: Rectangle {
-                    implicitWidth: 200
-                    implicitHeight: 60
-                    opacity: enabled ? 1 : 0.3
-                    color: type === 0 ? "#16213E" : (type === 1 ? "#FFCC80" : (type === 2 ? "#880E4F" : "#00ACC1"))
-                    radius: 30
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        transparentBorder: true
-                        horizontalOffset: 2
-                        verticalOffset: 2
-                        color: "#40000000"
-                    }
+                    Layout.fillWidth: true
                 }
                 
-                onClicked: {
-                    bgRect.opacity = 0
-                    closeTimer.start()
+                Text {
+                    text: messageStr
+                    color: "#d0d0d0"
+                    font.pixelSize: 14
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    maximumLineCount: 2
+                    wrapMode: Text.WordWrap
                 }
             }
+            
+            // Actions
+            ColumnLayout {
+                spacing: 12 // Increased spacing for cleaner look
+                
+                // Close / Complete ("我知道了")
+                Button {
+                    id: confirmBtn
+                    text: (forceMode && forceDuration > 0) ? forceDuration + "s" : "我知道了"
+                    enabled: !(forceMode && forceDuration > 0)
+                    Layout.preferredWidth: 100
+                    Layout.preferredHeight: 36
+                    
+                    background: Rectangle {
+                        radius: 18
+                        // Gradient Background for "Extreme Aesthetics"
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: confirmBtn.enabled ? Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.3) : Qt.rgba(1,1,1,0.05) }
+                            GradientStop { position: 1.0; color: confirmBtn.enabled ? Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.1) : Qt.rgba(1,1,1,0.02) }
+                        }
+                        border.color: confirmBtn.enabled ? themeColor : Qt.rgba(255,255,255,0.1)
+                        border.width: 1
+                        
+                        // Glow Effect on Hover
+                        layer.enabled: confirmBtn.enabled && confirmBtn.hovered
+                        layer.effect: Glow {
+                            radius: 8
+                            samples: 16
+                            color: themeColor
+                            spread: 0.3
+                        }
+                        
+                        // Progress Bar for Force Mode
+                        Rectangle {
+                            visible: forceMode && forceDuration > 0
+                            height: parent.height
+                            width: parent.width * (forceDuration / 30.0) 
+                            color: Qt.rgba(1,1,1,0.1)
+                            radius: 18
+                        }
+                    }
+                    
+                    contentItem: Text {
+                        text: parent.text
+                        color: confirmBtn.enabled ? "#ffffff" : "#808080"
+                        font.bold: true
+                        font.pixelSize: 13
+                        font.family: "Microsoft YaHei UI"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        
+                        // Text Shadow
+                        style: Text.Outline
+                        styleColor: confirmBtn.enabled ? Qt.rgba(themeColor.r, themeColor.g, themeColor.b, 0.3) : "transparent"
+                    }
+                    
+                    onClicked: closeAnim.start()
+                }
+                
+                // Snooze ("推迟 X 分")
+                Button {
+                    id: snoozeBtn
+                    text: "推迟 " + snoozeMinutes + " 分"
+                    visible: !forceMode
+                    Layout.preferredWidth: 100
+                    Layout.preferredHeight: 32
+                    
+                    background: Rectangle {
+                        radius: 16
+                        color: snoozeBtn.hovered ? Qt.rgba(255,255,255,0.1) : "transparent"
+                        border.color: snoozeBtn.hovered ? "#ffffff" : Qt.rgba(255,255,255,0.3)
+                        border.width: 1
+                        
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on border.color { ColorAnimation { duration: 150 } }
+                    }
+                    
+                    contentItem: Text {
+                        text: parent.text
+                        color: snoozeBtn.hovered ? "#ffffff" : "#d0d0d0"
+                        font.pixelSize: 12
+                        font.family: "Microsoft YaHei UI"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    
+                    // Mouse Wheel Logic for Snooze Duration
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onWheel: {
+                            var delta = wheel.angleDelta.y > 0 ? 1 : -1;
+                            var newVal = root.snoozeMinutes + delta;
+                            if (newVal < 1) newVal = 1;
+                            if (newVal > 10) newVal = 10;
+                            root.snoozeMinutes = newVal;
+                        }
+                        onPressed: mouse.accepted = false // Pass click to Button
+                    }
+                    
+                    onClicked: {
+                        console.log("Snoozing for " + root.snoozeMinutes + " minutes");
+                        root.snoozeRequested(root.snoozeMinutes)
+                        closeAnim.start()
+                    }
+                    
+                    ToolTip.visible: snoozeBtn.hovered
+                    ToolTip.text: "滚动鼠标滚轮调整时间 (1-10分)"
+                    ToolTip.delay: 500
+                }
+            }
+        }
+        
+        // Hover Handler to pause auto-close
+        HoverHandler {
+            id: hoverHandler
+        }
+        
+        // Drag Handler
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            onPressed: root.startSystemMove()
         }
     }
     
-    // Force Mode Timer
+    // Force Timer
     Timer {
-        id: forceTimer
         interval: 1000
         repeat: true
-        running: forceMode && reminderWin.visible
-        onTriggered: {
-            if (forceDuration > 0) {
-                forceDuration--
-            } else {
-                running = false
-            }
-        }
-    }
-
-    // Force Mode Countdown Display
-    Rectangle {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 40
-        width: 100
-        height: 100
-        radius: 50
-        color: "red"
-        visible: forceMode && forceDuration > 0
-        
-        Text {
-            anchors.centerIn: parent
-            text: forceDuration
-            color: "white"
-            font.pixelSize: 40
-            font.bold: true
-        }
-    }
-
-    // Video Placeholder for Health + Force Mode
-    Rectangle {
-        id: videoPlaceholder
-        width: 600
-        height: 400
-        color: "black"
-        anchors.centerIn: parent
-        visible: type === 3 && forceMode && reminderWin.visible
-        
-        Text {
-            anchors.centerIn: parent
-            text: "▶ 播放眼保健操教学视频..."
-            color: "white"
-            font.pixelSize: 30
-        }
-        
-        SequentialAnimation on color {
-            loops: Animation.Infinite
-            ColorAnimation { from: "#000000"; to: "#222222"; duration: 1000 }
-            ColorAnimation { from: "#222222"; to: "#000000"; duration: 1000 }
-        }
-    }
-
-    Timer {
-        id: closeTimer
-        interval: 500
-        onTriggered: reminderWin.destroy() // Destroy dynamic instance
+        running: forceMode && forceDuration > 0
+        onTriggered: forceDuration--
     }
 }

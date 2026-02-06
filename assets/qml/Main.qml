@@ -78,8 +78,15 @@ Window {
             }
             
             var win = component.createObject(mainWindow, props)
-            win.show()
-            win.requestActivate()
+            
+            // Connect snooze signal
+            if (win) {
+                win.snoozeRequested.connect(function(minutes) {
+                    scheduleManager.snoozeReminder(id, minutes)
+                })
+                win.show()
+                win.requestActivate()
+            }
         } else {
             console.error("Error loading ReminderWindow:", component.errorString())
         }
