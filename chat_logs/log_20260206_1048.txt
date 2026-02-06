@@ -1,0 +1,18 @@
+
+Time: 2026-02-06 10:48 (Estimated)
+User: 1. UI细节优化; 2. 修复 getCardColor 报错; 3. 增加鼠标拖动; 4. 实现打开提醒界面隐藏主界面的逻辑.
+Assistant: 
+已完成全部请求。
+1. 修复报错：
+   - 在 `ScheduleListWindow.qml` 中将 `getColor` 函数重命名为 `getCardColor`，解决了 `ReferenceError: getCardColor is not defined`。
+2. 增加拖拽功能：
+   - 在 `ScheduleListWindow.qml` 的背景层添加了 `MouseArea` 并绑定 `root.startSystemMove()`，现在点击窗口背景任意位置即可拖动窗口。
+3. 优化交互逻辑：
+   - 修改 `Main.qml` 中的 `openScheduleWindow` 函数。
+   - 打开提醒界面时，主界面现在会自动隐藏（类似于“时光足迹”的逻辑）。
+   - 关闭提醒界面时，主界面会自动恢复显示并带有平滑动画。
+4. UI 细节：
+   - 保持了之前的深色护眼风格，确保修复后的功能与现有 UI 完美融合。
+
+耗时统计：
+思考与执行耗时：约 3 分钟。

@@ -11,6 +11,12 @@
         <file>assets/qml/CalendarPicker.qml</file>
         <file>assets/qml/UpdateDialog.qml</file>
         <file>assets/qml/FluxChime.qml</file>
+        <file>assets/qml/ScheduleListWindow.qml</file>
+        <file>assets/qml/ReminderWindow.qml</file>
+        <file>assets/qml/ModernTextField.qml</file>
+        <file>assets/qml/TypeButton.qml</file>
+        <file>assets/qml/TimeInput.qml</file>
+        <file>assets/qml/ScheduleIcon.qml</file>
         <file>assets/images/tray_icon.svg</file>
     </qresource>
 </RCC>

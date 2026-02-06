@@ -11,6 +11,7 @@
 #include "core/UpdateManager.h"
 #include "core/StatisticsManager.h"
 #include "core/ActivityLogger.h"
+#include "core/ScheduleManager.h"
 #include "gui/TrayIcon.h"
 #include "utils/WindowUtils.h"
 
@@ -135,6 +136,7 @@ int main(int argc, char *argv[])
     UpdateManager updateManager; // 更新管理器
     StatisticsManager statsManager; // 用户统计管理器
     ActivityLogger activityLogger(&timerEngine); // 活动记录器 (新功能)
+    ScheduleManager scheduleManager; // 日程管理器 (新功能)
     TrayIcon trayIcon(&timerEngine, &updateManager);       // 系统托盘图标控制
     AppConfig appConfig;     // 配置管理 (读写注册表/配置文件)
     WindowUtils windowUtils; // 窗口工具 (处理置顶等原生 API)
@@ -159,6 +161,20 @@ int main(int argc, char *argv[])
     });
 
     // ========================================================================
+    // 4.5 连接日程管理信号 (ScheduleManager Integration)
+    // ========================================================================
+    // 将计时器的每秒心跳信号连接到日程检查，实现准时提醒
+    QObject::connect(&timerEngine, &TimerEngine::timeUpdated, 
+                     &scheduleManager, &ScheduleManager::checkSchedules);
+
+    // 当日程触发提醒时，通过托盘图标弹出气泡通知
+    QObject::connect(&scheduleManager, &ScheduleManager::reminderTriggered,
+                     &trayIcon, [&](const QString& title, const QString& /*type*/){
+        // 根据类型（虽然目前未深度使用类型）显示通知
+        trayIcon.showMessage("日程提醒", title);
+    });
+
+    // ========================================================================
     // 5. 初始化 QML 引擎 (前端加载)
     // ========================================================================
     // QQmlApplicationEngine 负责加载 QML 文件并管理 QML 上下文。
@@ -174,6 +190,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("timerEngine", &timerEngine);
     engine.rootContext()->setContextProperty("updateManager", &updateManager);
     engine.rootContext()->setContextProperty("activityLogger", &activityLogger);
+    engine.rootContext()->setContextProperty("scheduleManager", &scheduleManager);
     engine.rootContext()->setContextProperty("trayIcon", &trayIcon);
     engine.rootContext()->setContextProperty("appConfig", &appConfig);
     engine.rootContext()->setContextProperty("windowUtils", &windowUtils);
@@ -207,9 +224,10 @@ int main(int argc, char *argv[])
         clientConnection->deleteLater();
         
         // 获取主窗口并激活
-        if (engine.rootObjects().isEmpty()) return;
+        const auto& rootObjects = engine.rootObjects();
+        if (rootObjects.isEmpty()) return;
         
-        QObject* rootObject = engine.rootObjects().first();
+        QObject* rootObject = rootObjects.first();
         QWindow* window = qobject_cast<QWindow*>(rootObject);
         
         if (window) {

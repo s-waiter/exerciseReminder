@@ -1,0 +1,23 @@
+# Chat Log 2026-02-06 11:00
+
+## User Request
+User reported that the reminder interface is not showing and provided an error screenshot:
+`qrc:/assets/qml/ScheduleListWindow.qml:435:33: TimeInput is not a type`
+Also mentioned that the main settings interface disappeared.
+
+## Analysis
+The error indicates that `TimeInput` component is not recognized by the QML engine when loading `ScheduleListWindow.qml` from the QRC system (`qrc:/`).
+This is because although the file `TimeInput.qml` exists on disk, it was not added to the `resources.qrc` file, so it wasn't compiled into the application resources. The same applies to other newly created components: `ModernTextField.qml`, `TypeButton.qml`, and `ScheduleIcon.qml`.
+
+## Actions Taken
+1.  **Identified Missing Resources**: Verified that `resources.qrc` was missing the entries for the new QML files.
+2.  **Updated `resources.qrc`**: Added the following lines to `resources.qrc`:
+    - `<file>assets/qml/ModernTextField.qml</file>`
+    - `<file>assets/qml/TypeButton.qml</file>`
+    - `<file>assets/qml/TimeInput.qml</file>`
+    - `<file>assets/qml/ScheduleIcon.qml</file>`
+3.  **Verified Code**: Confirmed that `ScheduleListWindow.qml` correctly uses these components and that the component files themselves have valid QML syntax.
+4.  **Addressed Main Window Disappearance**: Previous fix in `Main.qml` (adding `onStatusChanged` to `scheduleLoader`) ensures that if loading fails (as it did here), the main window is restored. With the QRC fix, loading should now succeed.
+
+## Outcome
+The `TimeInput is not a type` error should be resolved after rebuilding the application, as the component files will now be available in the QRC system. The reminder interface should load correctly with the new modularized components.

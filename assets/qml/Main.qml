@@ -41,6 +41,57 @@ Window {
         }
     }
 
+    // Schedule Manager Windows
+    // property var scheduleWin: null // Replaced by Loader
+
+    function openScheduleWindow() {
+        if (scheduleLoader.active && scheduleLoader.item) {
+            scheduleLoader.item.visible = true
+            scheduleLoader.item.raise()
+            scheduleLoader.item.requestActivate()
+            return
+        }
+
+        // Save position but DO NOT hide yet
+        // We will hide only AFTER the schedule window is successfully loaded
+        if (!isPinned) {
+            savedX = x
+            savedY = y
+        }
+        
+        // Start loading
+        openScheduleTimer.restart()
+    }
+    
+    function showReminder(title, type, message, id, options) {
+        // Always create a new instance for stacking multiple reminders
+        var component = Qt.createComponent("ReminderWindow.qml")
+        if (component.status === Component.Ready) {
+            var props = {
+                "titleStr": title,
+                "type": type,
+                "messageStr": message,
+                "scheduleId": id
+            }
+            if (options && options.forceMode) {
+                props["forceMode"] = true
+            }
+            
+            var win = component.createObject(mainWindow, props)
+            win.show()
+            win.requestActivate()
+        } else {
+            console.error("Error loading ReminderWindow:", component.errorString())
+        }
+    }
+
+    Connections {
+        target: scheduleManager
+        function onReminderTriggered(title, type, message, id, options) {
+            showReminder(title, type, message, id, options)
+        }
+    }
+
     // 辅助函数：居中窗口
     function centerWindow() {
         // 智能定位：获取鼠标当前所在屏幕的几何信息
@@ -187,6 +238,55 @@ Window {
         interval: 150
         repeat: false
         onTriggered: dashboardLoader.active = true
+    }
+
+    // Loader for Schedule Window
+    Loader {
+        id: scheduleLoader
+        active: false
+        source: "ScheduleListWindow.qml"
+        onLoaded: {
+            item.visible = true
+            
+            // Hide main window NOW, only if loading was successful
+            // This prevents the main window from disappearing if loading fails
+            if (!isPinned) {
+                animationEnabled = false
+                mainWindow.x = -10000
+                mainWindow.opacity = 0
+                mainWindow.visible = false
+            }
+
+            // Connect closing signal
+            item.closing.connect(function() {
+                scheduleLoader.active = false
+                // Restore main window
+                if (!mainWindow.visible && !mainWindow.isPinned) {
+                    mainWindow.x = savedX
+                    mainWindow.y = savedY
+                    mainWindow.visible = true
+                    mainWindow.opacity = 1
+                    mainWindow.requestActivate()
+                    enableAnimationTimer.restart()
+                } else if (mainWindow.visible) {
+                    mainWindow.requestActivate()
+                }
+            })
+        }
+        onStatusChanged: {
+            if (status === Loader.Error) {
+                console.error("ScheduleLoader Error:", sourceComponent.errorString())
+                // Note: Main window is still visible here because we moved the hiding logic to onLoaded
+                toast.show("无法加载提醒界面\n" + sourceComponent.errorString(), "#FF4444")
+            }
+        }
+    }
+
+    Timer {
+        id: openScheduleTimer
+        interval: 150
+        repeat: false
+        onTriggered: scheduleLoader.active = true
     }
 
     Timer {
@@ -516,6 +616,25 @@ Window {
                 anchors.topMargin: 10
                 spacing: 5
                 
+                // 日程管理按钮
+                Button {
+                    id: scheduleBtn
+                    width: 30
+                    height: 30
+                    visible: !mainWindow.isPinned
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Text {
+                        text: "📅" 
+                        color: "white"
+                        font.pixelSize: 15
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        opacity: scheduleBtn.hovered ? 1.0 : 0.6
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                    onClicked: openScheduleWindow()
+                }
+
                 // 设置按钮
                 Button {
                     id: settingsBtn
