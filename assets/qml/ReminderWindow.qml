@@ -473,7 +473,7 @@ Window {
                     }
                     
                     onClicked: {
-                        console.log("Dismiss requested");
+                        // console.log("Dismiss requested");
                         root.dismissRequested()
                     }
                 }
