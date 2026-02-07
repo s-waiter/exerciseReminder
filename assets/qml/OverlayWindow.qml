@@ -45,6 +45,11 @@ Window {
     // 窗口可见性改变时的逻辑
     onVisibleChanged: {
         if(visible) {
+            // 阻止系统休眠 (防止长时间运动时锁屏)
+            if (typeof windowUtils !== "undefined") {
+                 windowUtils.setPreventSleep(true)
+            }
+
             // 确保几何属性正确 (防止多屏环境下的位置偏移)
             if (screen) {
                 width = screen.width
@@ -72,6 +77,10 @@ Window {
             // 重启动画
             mainEntranceAnim.restart()
         } else {
+            // 恢复系统休眠
+            if (typeof windowUtils !== "undefined") {
+                 windowUtils.setPreventSleep(false)
+            }
             // 隐藏时重置状态
             feedbackText = ""
         }

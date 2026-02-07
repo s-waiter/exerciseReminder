@@ -93,6 +93,16 @@ Item {
         monthChanged(currentYear, currentMonth)
     }
     
+    function previousYear() {
+        currentYear--
+        refreshCalendar()
+    }
+
+    function nextYear() {
+        currentYear++
+        refreshCalendar()
+    }
+
     function previousMonth() {
         if (currentMonth === 0) {
             currentMonth = 11
@@ -154,7 +164,25 @@ Item {
             // Header
             RowLayout {
                 Layout.fillWidth: true
+                spacing: 4
                 
+                // Prev Year
+                Button {
+                    text: "<<"
+                    flat: true
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    background: Rectangle { color: parent.hovered ? Qt.rgba(1,1,1,0.1) : "transparent"; radius: 16 }
+                    contentItem: Text { 
+                        text: "⏪"
+                        color: textColor
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter 
+                        opacity: 0.6
+                    }
+                    onClicked: previousYear()
+                }
+
                 // Prev Month
                 Button {
                     text: "<"
@@ -211,6 +239,23 @@ Item {
                         opacity: 0.8
                     }
                     onClicked: nextMonth()
+                }
+
+                // Next Year
+                Button {
+                    text: ">>"
+                    flat: true
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    background: Rectangle { color: parent.hovered ? Qt.rgba(1,1,1,0.1) : "transparent"; radius: 16 }
+                    contentItem: Text { 
+                        text: "⏩"
+                        color: textColor
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter 
+                        opacity: 0.6
+                    }
+                    onClicked: nextYear()
                 }
             }
             

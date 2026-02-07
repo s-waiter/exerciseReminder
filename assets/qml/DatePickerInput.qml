@@ -12,6 +12,7 @@ Item {
     property color primaryColor: "#00d2ff"
     property color textColor: "#d0d0d0"
     property color inputBgColor: Qt.rgba(0, 0, 0, 0.3)
+    property string placeholderText: "选择日期"
     
     onTextChanged: {
         if (!text) return
@@ -46,7 +47,7 @@ Item {
         
         Text {
             anchors.centerIn: parent
-            text: root.text || "选择日期"
+            text: root.text || root.placeholderText
             color: root.text ? textColor : "#808895"
             font.pixelSize: 14
         }

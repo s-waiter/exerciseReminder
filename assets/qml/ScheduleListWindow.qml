@@ -349,12 +349,35 @@ Window {
                                                 Layout.fillWidth: true
                                             }
                                             Switch {
+                                                id: control
                                                 checked: modelData.enabled
                                                 onCheckedChanged: {
                                                     if (checked !== modelData.enabled) {
                                                         var d = modelData
                                                         d.enabled = checked
                                                         scheduleManager.updateSchedule(modelData.id, d)
+                                                    }
+                                                }
+                                                
+                                                indicator: Rectangle {
+                                                    implicitWidth: 40
+                                                    implicitHeight: 20
+                                                    x: control.leftPadding
+                                                    y: parent.height / 2 - height / 2
+                                                    radius: 10
+                                                    color: control.checked ? "#00d2ff" : "#333333"
+                                                    border.color: control.checked ? "#00d2ff" : "#666666"
+                                                    
+                                                    Rectangle {
+                                                        x: control.checked ? parent.width - width - 2 : 2
+                                                        y: 2
+                                                        width: 16
+                                                        height: 16
+                                                        radius: 8
+                                                        color: "#ffffff"
+                                                        Behavior on x {
+                                                            NumberAnimation { duration: 150 }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -375,6 +398,39 @@ Window {
                                             text: getRepeatText(modelData)
                                             color: secondaryTextColor
                                             font.pixelSize: 14
+                                        }
+                                        
+                                        // Time Perception Display (Red Box Style)
+                                        Rectangle {
+                                            visible: modelData.timePerceptionText !== "" && modelData.timePerceptionText !== undefined
+                                            Layout.fillWidth: true
+                                            height: layoutContent.implicitHeight + 12 // Dynamic height
+                                            radius: 6
+                                            color: Qt.rgba(dangerColor.r, dangerColor.g, dangerColor.b, 0.15)
+                                            border.color: Qt.rgba(dangerColor.r, dangerColor.g, dangerColor.b, 0.3)
+                                            
+                                            RowLayout {
+                                                id: layoutContent
+                                                anchors.centerIn: parent
+                                                width: parent.width - 8
+                                                spacing: 6
+                                                
+                                                Text {
+                                                    text: "⏳"
+                                                    font.pixelSize: 12
+                                                    Layout.alignment: Qt.AlignTop // Align top for multiline
+                                                    Layout.topMargin: 3
+                                                }
+                                                Text {
+                                                    text: modelData.timePerceptionText || ""
+                                                    color: "#ff3b30" // Red text
+                                                    font.pixelSize: 13
+                                                    font.bold: true
+                                                    Layout.fillWidth: true
+                                                    wrapMode: Text.WordWrap // Enable wrapping
+                                                    lineHeight: 1.2 // Nice spacing
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -457,8 +513,19 @@ Window {
                         }
                     }
                     
-                    // 1. Title
-                    ModernTextField {
+                    // Scrollable Content
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                        
+                        ColumnLayout {
+                            width: parent.width
+                            spacing: 24
+
+                            // 1. Title
+                            ModernTextField {
                         id: titleField
                         placeholderText: "做什么？(例如：喝水、开会)"
                         Layout.fillWidth: true
@@ -518,27 +585,27 @@ Window {
                     ColumnLayout {
                         spacing: 12
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        // Layout.fillHeight: true // Removed for ScrollView
                         Label { text: "重复规则"; color: secondaryTextColor; font.pixelSize: 14 }
                         
                         // Custom Tabs
                         RowLayout {
                             spacing: 8
                             Repeater {
-                                model: ["每天", "每周", "每月", "每年", "自定义"]
+                                model: ["单次", "每天", "每周", "每月", "每年", "自定义"]
                                 Rectangle {
-                                    width: 60; height: 32; radius: 8
-                                    color: freqLogic.currentTab === (index+1) ? primaryColor : "transparent"
-                                    border.color: freqLogic.currentTab === (index+1) ? primaryColor : borderColor
+                                    width: 50; height: 32; radius: 8
+                                    color: freqLogic.currentTab === index ? primaryColor : "transparent"
+                                    border.color: freqLogic.currentTab === index ? primaryColor : borderColor
                                     Text { 
                                         text: modelData
                                         anchors.centerIn: parent
-                                        color: freqLogic.currentTab === (index+1) ? "#141E30" : secondaryTextColor 
-                                        font.bold: freqLogic.currentTab === (index+1)
+                                        color: freqLogic.currentTab === index ? "#141E30" : secondaryTextColor 
+                                        font.bold: freqLogic.currentTab === index
                                     }
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: freqLogic.currentTab = (index+1)
+                                        onClicked: freqLogic.currentTab = index
                                         cursorShape: Qt.PointingHandCursor
                                     }
                                 }
@@ -547,6 +614,18 @@ Window {
                         Item { id: freqLogic; property int currentTab: 1 }
 
                         // Content per Tab (Same Logic, Better UI)
+                        // Once (Tab 0)
+                        RowLayout {
+                            visible: freqLogic.currentTab === 0
+                            Layout.topMargin: 4
+                            Label { text: "日期"; color: secondaryTextColor }
+                            DatePickerInput {
+                                id: onceDateInput
+                                implicitWidth: 140
+                                placeholderText: "选择日期"
+                            }
+                        }
+
                         // Weekly
                         ColumnLayout {
                             visible: freqLogic.currentTab === 2
@@ -582,6 +661,41 @@ Window {
                                     }
                                 }
                             }
+                            
+                            // Quick Select
+                            RowLayout {
+                                spacing: 10
+                                Layout.topMargin: 4
+                                Repeater {
+                                    model: [
+                                        {label: "工作日", days: [0,1,2,3,4]}, 
+                                        {label: "周末", days: [5,6]},
+                                        {label: "每天", days: [0,1,2,3,4,5,6]}
+                                    ]
+                                    Rectangle {
+                                        width: 60; height: 24; radius: 12
+                                        color: "transparent"
+                                        border.color: mouseArea.containsMouse ? primaryColor : Qt.rgba(255,255,255,0.2)
+                                        border.width: 1
+                                        
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            color: mouseArea.containsMouse ? primaryColor : "#808895"
+                                            font.pixelSize: 12
+                                        }
+                                        
+                                        MouseArea {
+                                            id: mouseArea
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            hoverEnabled: true
+                                            onClicked: weeklyModel.set(modelData.days)
+                                        }
+                                    }
+                                }
+                            }
+
                             Item {
                                 id: weeklyModel
                                 property var days: [false,false,false,false,false,false,false]
@@ -615,6 +729,12 @@ Window {
                             visible: freqLogic.currentTab === 4
                             spacing: 10
                             RowLayout {
+                                CustomCheckBox {
+                                    id: lunarCheck
+                                    text: "农历"
+                                    checked: false
+                                    checkedColor: primaryColor
+                                }
                                 ModernTextField {
                                     id: monthInput
                                     placeholderText: "月"
@@ -666,7 +786,7 @@ Window {
                                 }
                                 CustomComboBox {
                                     id: intervalUnit
-                                    model: ["周", "天"]
+                                    model: ["周", "天", "小时", "分钟"]
                                     currentIndex: 0
                                     implicitWidth: 80
                                 }
@@ -676,23 +796,92 @@ Window {
                                 DatePickerInput {
                                     id: startDateInput
                                     implicitWidth: 120
-                                    text: Qt.formatDate(new Date(), "yyyy-MM-dd")
-                                }
-                                Label { 
-                                    text: root.getWeekDay(startDateInput.text)
-                                    color: primaryColor
                                 }
                             }
                         }
+                    }
+
+                    // 5. Time Perception (Advanced)
+                    ColumnLayout {
+                        spacing: 12
+                        Layout.fillWidth: true
                         
-                        // Prepared Check
+                        // Toggle Section
                         RowLayout {
-                            visible: currentId !== "" && typeField.currentType === 2 && freqLogic.currentTab === 4
+                            Label { text: "时间感知"; color: secondaryTextColor; font.pixelSize: 14 }
+                            Item { Layout.fillWidth: true }
                             CustomCheckBox {
-                                id: preparedCheck
-                                text: "今年礼物已准备 (不再提醒)"
+                                id: perceptionCheck
+                                text: "启用"
                                 checked: false
-                                checkedColor: healthColor
+                                checkedColor: accentColor
+                            }
+                        }
+                        
+                        ColumnLayout {
+                            visible: perceptionCheck.checked
+                            spacing: 10
+                            Layout.fillWidth: true
+                            
+                            // Target Date & Calendar Type
+                            RowLayout {
+                                spacing: 10
+                                CustomComboBox {
+                                    id: perceptionCalendarType
+                                    model: ["公历", "农历"]
+                                    currentIndex: 0
+                                    implicitWidth: 80
+                                }
+                                DatePickerInput {
+                                    id: perceptionTargetDate
+                                    implicitWidth: 140
+                                    placeholderText: "目标/起始日期"
+                                }
+                            }
+                            
+                            // Display Options
+                            RowLayout {
+                                spacing: 15
+                                CustomCheckBox {
+                                    id: showTimeSinceCheck
+                                    text: "显示已过去" // For Birthday/Anniversary
+                                    checkedColor: accentColor
+                                }
+                                CustomCheckBox {
+                                    id: showCountdownCheck
+                                    text: "显示倒计时" // For Exam
+                                    checkedColor: accentColor
+                                }
+                                CustomCheckBox {
+                                    id: dailyBroadcastCheck
+                                    text: "每日播报"
+                                    visible: showCountdownCheck.checked
+                                    checkedColor: accentColor
+                                }
+                            }
+                            
+                            // Auto Switch
+                            RowLayout {
+                                visible: showCountdownCheck.checked
+                                CustomCheckBox {
+                                    id: autoSwitchCheck
+                                    text: "到期后自动切换为“已过去”" // For Exam -> Post-Exam
+                                    checked: true
+                                    checkedColor: accentColor
+                                }
+                            }
+                        }
+                    }
+
+                            // Prepared Check
+                            RowLayout {
+                                visible: currentId !== "" && typeField.currentType === 2 && freqLogic.currentTab === 4
+                                CustomCheckBox {
+                                    id: preparedCheck
+                                    text: "今年礼物已准备 (不再提醒)"
+                                    checked: false
+                                    checkedColor: healthColor
+                                }
                             }
                         }
                     }
@@ -714,8 +903,7 @@ Window {
                             }
                             contentItem: Text { text: parent.text; color: dangerColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             onClicked: {
-                                scheduleManager.removeSchedule(currentId)
-                                closeDrawer()
+                                deleteConfirmDialog.open()
                             }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
                         }
@@ -819,9 +1007,17 @@ Window {
     }
 
     function getRepeatText(data) {
-        var type = data.repeatType || 1
+        var type = (data.repeatType !== undefined) ? data.repeatType : 1
         var rule = data.repeatRule || {}
+        var calSuffix = (data.calendarType === 1) ? " (农历)" : " (公历)"
         
+        if (type === 0) {
+            // Check if we have a target date (for "Once" events)
+            if (data.targetDate) {
+                 return data.targetDate + calSuffix + " (单次)"
+            }
+            return "单次"
+        }
         if (type === 1) return "每天"
         if (type === 2) {
             var days = rule.days || []
@@ -838,7 +1034,7 @@ Window {
             return "每月 " + rule.day + " 日"
         }
         if (type === 4) {
-            var str = "每年 " + rule.month + "月" + rule.day + "日"
+            var str = "每年 " + rule.month + "月" + rule.day + "日" + calSuffix
             if (data.advanceDays > 0) str += " (提前" + data.advanceDays + "天)"
             return str
         }
@@ -866,16 +1062,30 @@ Window {
         minuteInput.text = t[1]
         
         // Load Frequency
-        freqLogic.currentTab = data.repeatType || 1
+        freqLogic.currentTab = (data.repeatType !== undefined) ? data.repeatType : 1
         var rule = data.repeatRule || {}
         
-        if (data.repeatType === 2) { // Weekly
+        if (data.repeatType === 0) { // Once
+            if (data.targetDate) {
+                 onceDateInput.text = data.targetDate
+            } else {
+                 onceDateInput.text = Qt.formatDate(new Date(), "yyyy-MM-dd")
+            }
+        } else if (data.repeatType === 2) { // Weekly
             var days = rule.days || []
             weeklyModel.set(days.map(function(d){return d-1}))
         } else if (data.repeatType === 3) { // Monthly
             lastDayCheck.checked = (rule.day === -1)
             if (rule.day !== -1) dayOfMonthInput.text = rule.day
         } else if (data.repeatType === 4) { // Yearly
+            // Check if using Lunar
+            // Assuming data.calendarType is set. If not, default to 0 (Gregorian)
+            if (data.calendarType === 1) {
+                lunarCheck.checked = true
+            } else {
+                lunarCheck.checked = false
+            }
+
             monthInput.text = rule.month
             dayInput.text = rule.day
             advanceCheck.checked = (data.advanceDays > 0)
@@ -883,8 +1093,35 @@ Window {
             preparedCheck.checked = data.isPrepared || false
         } else if (data.repeatType === 5) { // Custom
             intervalInput.text = rule.interval
-            intervalUnit.currentIndex = (rule.unit === "day" ? 1 : 0)
-            startDateInput.text = Qt.formatDate(rule.startDate, "yyyy-MM-dd")
+            var u = rule.unit
+            if (u === "week") intervalUnit.currentIndex = 0
+            else if (u === "day") intervalUnit.currentIndex = 1
+            else if (u === "hour") intervalUnit.currentIndex = 2
+            else if (u === "minute") intervalUnit.currentIndex = 3
+            else intervalUnit.currentIndex = 1 // Default to day
+            
+            // For hour/minute, startDate is still used as anchor date
+            if (rule.startDate) {
+                // startDate is QDate string in JSON, but rule.startDate might be QDate object if coming from C++ directly?
+                // Actually openEdit(data) comes from QVariantMap
+                // If it's a string
+                startDateInput.text = (typeof rule.startDate === 'string' ? rule.startDate : Qt.formatDate(rule.startDate, "yyyy-MM-dd"))
+            }
+        }
+
+        // Time Perception
+        if (data.showTimeSince || data.showCountdown) {
+            perceptionCheck.checked = true
+            perceptionCalendarType.currentIndex = (data.calendarType === 1 ? 1 : 0)
+            if (data.targetDate) {
+                 perceptionTargetDate.text = data.targetDate
+            }
+            showTimeSinceCheck.checked = data.showTimeSince
+            showCountdownCheck.checked = data.showCountdown
+            dailyBroadcastCheck.checked = data.dailyBroadcast
+            autoSwitchCheck.checked = data.autoSwitch
+        } else {
+            perceptionCheck.checked = false
         }
         
         isCreatePanelOpen = true
@@ -899,8 +1136,10 @@ Window {
         minuteInput.text = "00"
         freqLogic.currentTab = 1
         weeklyModel.days = [false,false,false,false,false,false,false]
+        onceDateInput.text = Qt.formatDate(new Date(), "yyyy-MM-dd")
         lastDayCheck.checked = false
         dayOfMonthInput.text = ""
+        lunarCheck.checked = false
         monthInput.text = ""
         dayInput.text = ""
         advanceCheck.checked = false
@@ -909,6 +1148,15 @@ Window {
         intervalUnit.currentIndex = 0
         startDateInput.text = Qt.formatDate(new Date(), "yyyy-MM-dd")
         preparedCheck.checked = false
+        
+        // Reset Time Perception
+        perceptionCheck.checked = false
+        perceptionCalendarType.currentIndex = 0
+        perceptionTargetDate.text = ""
+        showTimeSinceCheck.checked = false
+        showCountdownCheck.checked = false
+        dailyBroadcastCheck.checked = false
+        autoSwitchCheck.checked = true
     }
 
     function closeDrawer() {
@@ -929,9 +1177,33 @@ Window {
         }
         
         var now = new Date()
+        
+        if (freqLogic.currentTab === 0) { // Once
+            var dateStr = onceDateInput.text
+            if (dateStr === "") { toast.show("请选择日期"); return }
+            var d = new Date(dateStr)
+            if (isNaN(d.getTime())) { toast.show("日期格式错误"); return }
+            now = d
+        }
+        
         now.setHours(h)
         now.setMinutes(m)
         now.setSeconds(0)
+        
+        // Determine Calendar Type (Global for item, used by Repeat and Perception)
+        // Priority: If Yearly tab is selected, use lunarCheck. 
+        // If Perception is enabled, use perceptionCalendarType.
+        // Ideally they should be consistent or we store them separately?
+        // ScheduleItem has one `calendarType`.
+        // If Repeat is Yearly, we use `lunarCheck`.
+        // If Repeat is Once (Countdown), we use `perceptionCalendarType`.
+        
+        var calType = 0
+        if (freqLogic.currentTab === 4) { // Yearly
+             calType = lunarCheck.checked ? 1 : 0
+        } else if (perceptionCheck.checked) {
+             calType = perceptionCalendarType.currentIndex === 1 ? 1 : 0
+        }
         
         var repeatRule = {}
         if (freqLogic.currentTab === 2) { // Weekly
@@ -957,10 +1229,14 @@ Window {
         } else if (freqLogic.currentTab === 5) { // Custom
             var interval = parseInt(intervalInput.text)
             if (isNaN(interval)) { toast.show("间隔错误"); return }
+            
+            var units = ["week", "day", "hour", "minute"]
+            var selectedUnit = units[intervalUnit.currentIndex]
+            
             repeatRule = {
                 interval: interval,
-                unit: intervalUnit.currentIndex === 0 ? "week" : "day",
-                startDate: new Date(startDateInput.text)
+                unit: selectedUnit,
+                startDate: startDateInput.text
             }
         }
 
@@ -974,7 +1250,15 @@ Window {
             repeatRule: repeatRule,
             advanceDays: (advanceCheck.checked ? parseInt(advanceDaysInput.text) : 0),
             isPrepared: preparedCheck.checked,
-            lastTriggered: editingData ? editingData.lastTriggered : undefined // Preserve lastTriggered
+            lastTriggered: editingData ? editingData.lastTriggered : undefined, // Preserve lastTriggered
+            
+            // Time Perception
+            calendarType: calType,
+            targetDate: (perceptionCheck.checked && perceptionTargetDate.text !== "" ? perceptionTargetDate.text : (freqLogic.currentTab === 0 ? Qt.formatDate(now, "yyyy-MM-dd") : "")),
+            showTimeSince: (perceptionCheck.checked ? showTimeSinceCheck.checked : (freqLogic.currentTab === 0 && now < new Date())),
+            showCountdown: (perceptionCheck.checked ? showCountdownCheck.checked : (freqLogic.currentTab === 0 && now >= new Date())),
+            dailyBroadcast: (perceptionCheck.checked && showCountdownCheck.checked && dailyBroadcastCheck.checked),
+            autoSwitch: (perceptionCheck.checked ? autoSwitchCheck.checked : true)
         }
         
         if (currentId) {
@@ -985,5 +1269,102 @@ Window {
             toast.show("已创建")
         }
         closeDrawer()
+    }
+
+    // Delete Confirmation Dialog
+    Rectangle {
+        id: deleteConfirmDialog
+        anchors.fill: parent
+        color: "#AA000000" // Semi-transparent black
+        visible: false
+        z: 999 // Ensure it's on top
+        
+        property string pendingId: ""
+
+        function open() {
+            pendingId = currentId
+            visible = true
+        }
+
+        function close() {
+            visible = false
+            pendingId = ""
+        }
+
+        MouseArea { anchors.fill: parent; onClicked: deleteConfirmDialog.close() } // Click outside to close
+
+        Rectangle {
+            width: 320; height: 180
+            anchors.centerIn: parent
+            color: "#141E30"
+            border.color: borderColor
+            border.width: 1
+            radius: 12
+
+            MouseArea { anchors.fill: parent } // Block click through
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 16
+
+                Text {
+                    text: "确认删除"
+                    color: "white"
+                    font.pixelSize: 18
+                    font.bold: true
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Text {
+                    text: "确定要删除这个提醒吗？\n此操作无法撤销。"
+                    color: secondaryTextColor
+                    font.pixelSize: 14
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+
+                Item { Layout.fillHeight: true } // Spacer
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 16
+
+                    Button {
+                        text: "取消"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        background: Rectangle {
+                            color: "transparent"
+                            border.color: borderColor
+                            radius: 8
+                        }
+                        contentItem: Text { text: parent.text; color: secondaryTextColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: deleteConfirmDialog.close()
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
+                    }
+
+                    Button {
+                        text: "确认删除"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        background: Rectangle {
+                            color: dangerColor
+                            radius: 8
+                        }
+                        contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        onClicked: {
+                            scheduleManager.removeSchedule(deleteConfirmDialog.pendingId)
+                            deleteConfirmDialog.close()
+                            closeDrawer() // Close the edit drawer too
+                            toast.show("已删除")
+                        }
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
+                    }
+                }
+            }
+        }
     }
 }

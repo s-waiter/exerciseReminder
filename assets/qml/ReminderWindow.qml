@@ -45,6 +45,7 @@ Window {
     property string messageStr: "时间到了！"
     property int type: 0 // 0:Work, 1:Life, 2:Anniversary, 3:Health
     property string scheduleId: ""
+    property string perceptionText: "" // New property for Time Perception
     property bool forceMode: false
     property int forceDuration: 30
     property int snoozeMinutes: 5 // Default snooze time
@@ -412,8 +413,39 @@ Window {
                     font.pixelSize: 14
                     elide: Text.ElideRight
                     Layout.fillWidth: true
-                    maximumLineCount: 2
+                    maximumLineCount: 3 // Increased for Time Perception text
                     wrapMode: Text.WordWrap
+                }
+
+                // Time Perception Display (Red Box Style)
+                Rectangle {
+                    visible: perceptionText !== ""
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    height: 28
+                    radius: 6
+                    color: Qt.rgba(1, 0.23, 0.18, 0.15) // Red background (low opacity)
+                    border.color: Qt.rgba(1, 0.23, 0.18, 0.3) // Red border
+                    
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        spacing: 6
+                        
+                        Text {
+                            text: "⏳"
+                            font.pixelSize: 12
+                        }
+                        
+                        Text {
+                            text: perceptionText
+                            color: "#ff3b30" // Apple Red / High contrast red
+                            font.pixelSize: 13
+                            font.bold: true
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
                 }
             }
             

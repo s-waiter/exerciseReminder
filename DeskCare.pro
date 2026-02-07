@@ -15,7 +15,8 @@ SOURCES += \
     src/core/StatisticsManager.cpp \
     src/core/Version.cpp \
     src/core/ActivityLogger.cpp \
-    src/core/ScheduleManager.cpp
+    src/core/ScheduleManager.cpp \
+    src/utils/LunarCalendar.cpp
 
 HEADERS += \
     src/core/TimerEngine.h \
@@ -26,7 +27,8 @@ HEADERS += \
     src/core/StatisticsManager.h \
     src/core/Version.h \
     src/core/ActivityLogger.h \
-    src/core/ScheduleManager.h
+    src/core/ScheduleManager.h \
+    src/utils/LunarCalendar.h
 
 RESOURCES += resources.qrc
 

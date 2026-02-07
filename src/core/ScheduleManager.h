@@ -2,10 +2,12 @@
 #define SCHEDULEMANAGER_H
 
 #include <QObject>
-#include <QVariant>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QDateTime>
+#include <QVariant>
 #include <QVector>
-#include <QMap>
+#include "../utils/LunarCalendar.h"
 
 struct ScheduleItem {
     QString id;
@@ -17,12 +19,15 @@ struct ScheduleItem {
     // Repeat Logic
     int repeatType; // 0: Once, 1: Daily, 2: Weekly, 3: Monthly, 4: Yearly, 5: Custom
     QVariantMap repeatRule; 
-    // Weekly: { "days": [1, 3, 5] }
-    // Monthly: { "day": 31 } (31 or -1 means last day)
-    // Yearly: { "month": 4, "day": 15 }
-    // Custom: { "interval": 2, "unit": "week"|"day", "startDate": "2023-01-01" }
+    
+    // Anniversary / Time Perception Logic
+    int calendarType; // 0: Gregorian, 1: Lunar
+    QDate targetDate; // The reference date (e.g. Birthday, Exam Date). For Lunar, stores (Year, Month, Day).
+    bool showTimeSince; // Display "X days since..."
+    bool showCountdown; // Display "X days until..."
+    bool dailyBroadcast; // Trigger reminder daily for countdown events
+    bool autoSwitch; // Auto switch from Countdown to TimeSince after event passes
 
-    // Anniversary Specific
     int advanceDays; // 0 means no advance reminder
     bool isPrepared; // true means gift is ready, stop reminding
 
@@ -32,6 +37,9 @@ struct ScheduleItem {
     static ScheduleItem fromMap(const QVariantMap& map);
     QVariantMap toMap() const;
     QString getFrequencyText() const;
+    
+    // Helper to get calculated display text
+    QString getTimePerceptionText() const;
 };
 
 class ScheduleManager : public QObject

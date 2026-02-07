@@ -107,6 +107,12 @@ Window {
             "messageStr": message,
             "scheduleId": id
         }
+        
+        // Handle Perception Text (Time Since / Countdown)
+        if (options && options.perceptionText) {
+            props["perceptionText"] = options.perceptionText
+        }
+
         if (options && options.forceMode) {
             props["forceMode"] = true
         }
@@ -1417,6 +1423,9 @@ Window {
                 property point lastClickGlobalPos
 
                 onDoubleClicked: {
+                    // 修复：双击切换模式前强制关闭右键菜单，防止菜单残留无法关闭
+                    quickMenu.close()
+
                     // 右键双击：触发整点报时特效 (观摩模式)
                     // 仅在迷你模式下生效
                     if (mouse.button === Qt.RightButton) {
@@ -1645,6 +1654,14 @@ Window {
                             label: "时光足迹"
                             shortcut: ""
                             onTriggered: mainWindow.showDashboard()
+                        }
+
+                        MenuItemRow {
+                            icon: "🔔"
+                            label: "提醒事项"
+                            shortcut: ""
+                            visible: mainWindow.isPinned // 仅在迷你模式下显示 (正常模式已有卡片入口)
+                            onTriggered: openScheduleWindow()
                         }
                         
                         // 底部间距
