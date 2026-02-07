@@ -7,12 +7,35 @@ import QtQuick.Particles 2.0
 
 Window {
     id: root
-    width: 420
-    height: 140 // Compact height
+    property bool miniMode: false // New Mini Mode
     
-    // Position: Top Right (Default) - calculated in Component.onCompleted
-    x: Screen.width - width - 30
-    y: 30
+    // Dynamic resizing based on miniMode
+    width: miniMode ? 300 : 420
+    height: miniMode ? 130 : 140
+    
+    // Identification for stacking logic
+    readonly property bool isReminderCard: true
+
+    // Position: Top Right (Multi-screen aware)
+    // We use 'screen' property (set by Main.qml) to determine offset
+    // Initial Y is set here, but will be overridden by Main.qml stacking logic
+    x: (screen ? screen.virtualX : 0) + (screen ? screen.width : Screen.width) - width - 30
+    y: (screen ? screen.virtualY : 0) + 30
+
+    // Smooth animation when stacking position changes
+    Behavior on y {
+        id: yBehavior
+        enabled: false // Disabled initially to prevent entry animation glitch
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+    }
+    
+    // Enable animation after initialization
+    Timer {
+        interval: 500
+        running: true
+        repeat: false
+        onTriggered: yBehavior.enabled = true
+    }
     
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
@@ -54,9 +77,20 @@ Window {
     }
     */
     
+    // Ensure this window stays on top of Danmaku windows
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.visible
+        onTriggered: {
+            root.raise()
+        }
+    }
+    
     // Entry Animation
     Component.onCompleted: {
         showAnim.start()
+        root.raise() // Ensure on top initially
     }
     
     ParallelAnimation {
@@ -147,7 +181,7 @@ Window {
                         width: Math.random() * 4 + 2
                         height: width
                         color: "#00d2ff"
-                        opacity: 0.6
+                        opacity: 0.02 // Extremely subtle
                         radius: 1
                     }
                 }
@@ -157,7 +191,7 @@ Window {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     width: 1; height: parent.height
-                    emitRate: 20
+                    emitRate: 1 // Minimal
                     lifeSpan: 2000
                     size: 4
                     velocity: AngleDirection { angle: 0; magnitude: 150; magnitudeVariation: 50 }
@@ -182,19 +216,19 @@ Window {
                 
                 ItemParticle {
                     delegate: Rectangle {
-                        width: 8; height: 8
-                        radius: 4
+                        width: 6; height: 6 // Smaller
+                        radius: 3
                         color: "#00ff88"
-                        opacity: 0.4
+                        opacity: 0.03 // Subtle
                     }
                 }
                 
                 Emitter {
                     anchors.fill: parent
-                    emitRate: 10
+                    emitRate: 1 // Minimal
                     lifeSpan: 4000
-                    size: 8
-                    sizeVariation: 4
+                    size: 6
+                    sizeVariation: 2
                     velocity: AngleDirection { angle: -90; angleVariation: 180; magnitude: 10 }
                 }
                 
@@ -220,19 +254,17 @@ Window {
                 anchors.fill: parent
                 running: parent.visible
                 
-                // Confetti Strips
+                // Confetti Strips (Optimized: Single Theme Color, Cleaner Look)
                 ItemParticle {
                     id: ribbonParticle
                     groups: ["ribbons"]
                     delegate: Rectangle {
-                        width: Math.random() > 0.5 ? 8 : 4
-                        height: Math.random() > 0.5 ? 4 : 12 
-                        color: {
-                            var colors = ["#ff0055", "#ffcc00", "#00d2ff", "#ffffff", "#ff00ff"];
-                            return colors[Math.floor(Math.random() * colors.length)];
-                        }
+                        width: Math.random() > 0.5 ? 6 : 3
+                        height: Math.random() > 0.5 ? 3 : 8 
+                        // Use themeColor instead of random rainbow colors for high-end feel
+                        color: themeColor 
                         radius: 2
-                        opacity: 0.9
+                        opacity: 0.04 // Very subtle
                     }
                 }
                 
@@ -240,12 +272,12 @@ Window {
                 ItemParticle {
                     groups: ["sparkles"]
                     delegate: Rectangle {
-                        width: 3; height: 3
+                        width: 2; height: 2
                         color: "#ffffff"
                         opacity: 0
                         SequentialAnimation on opacity {
                             loops: Animation.Infinite
-                            NumberAnimation { to: 1; duration: 200 }
+                            NumberAnimation { to: 0.15; duration: 200 } // Subtle flash
                             NumberAnimation { to: 0; duration: 200 }
                         }
                     }
@@ -258,22 +290,22 @@ Window {
                     anchors.bottomMargin: -10
                     width: parent.width
                     height: 20
-                    emitRate: 30 
+                    emitRate: 3 // Drastically reduced from 15
                     lifeSpan: 3500
                     lifeSpanVariation: 500
-                    size: 8
-                    sizeVariation: 4
-                    velocity: AngleDirection { angle: -90; angleVariation: 60; magnitude: 60; magnitudeVariation: 30 }
-                    acceleration: PointDirection { y: 30 }
+                    size: 6
+                    sizeVariation: 2
+                    velocity: AngleDirection { angle: -90; angleVariation: 60; magnitude: 40; magnitudeVariation: 20 }
+                    acceleration: PointDirection { y: 10 }
                 }
                 
                 // Sparkle Emitter
                 Emitter {
                     group: "sparkles"
                     anchors.fill: parent
-                    emitRate: 20
+                    emitRate: 4 // Reduced from 20
                     lifeSpan: 1000
-                    size: 4
+                    size: 2
                 }
                 
                 Wander {
@@ -298,19 +330,19 @@ Window {
                 width: parent.width * 0.8
                 height: parent.height * 0.8
                 radius: width / 2
-                color: Qt.rgba(1, 0.5, 0, 0.15) // Orange tint
+                color: Qt.rgba(1, 0.5, 0, 0.08) // Very faint tint
                 
                 SequentialAnimation on scale {
                     running: type === 3
                     loops: Animation.Infinite
-                    NumberAnimation { to: 1.5; duration: 2000; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.2; duration: 3000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: 3000; easing.type: Easing.InOutSine }
                 }
                 SequentialAnimation on opacity {
                     running: type === 3
                     loops: Animation.Infinite
-                    NumberAnimation { to: 0.3; duration: 2000; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 0.1; duration: 2000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 0.15; duration: 3000; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 0.05; duration: 3000; easing.type: Easing.InOutSine }
                 }
             }
             

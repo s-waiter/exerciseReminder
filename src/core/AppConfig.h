@@ -32,6 +32,9 @@ class AppConfig : public QObject
     // 整点报时开关 (新增)
     Q_PROPERTY(bool hourlyChimeEnabled READ isHourlyChimeEnabled WRITE setHourlyChimeEnabled NOTIFY hourlyChimeEnabledChanged)
 
+    // 提醒模式 (0: 卡片模式, 1: 弹幕模式)
+    Q_PROPERTY(int reminderMode READ reminderMode WRITE setReminderMode NOTIFY reminderModeChanged)
+
     // 工作时长 (分钟) - 持久化存储
     Q_PROPERTY(int workDuration READ workDuration WRITE setWorkDuration NOTIFY workDurationChanged)
 
@@ -59,6 +62,11 @@ public:
     // 设置整点报时开关
     void setHourlyChimeEnabled(bool enabled);
 
+    // 读取提醒模式
+    int reminderMode() const;
+    // 设置提醒模式
+    void setReminderMode(int mode);
+
     // 读取工作时长
     int workDuration() const;
     // 设置工作时长
@@ -70,6 +78,7 @@ signals:
     void forcedExerciseChanged(bool enabled);
     void forcedExerciseDurationChanged(int minutes);
     void hourlyChimeEnabledChanged(bool enabled);
+    void reminderModeChanged(int mode);
     void workDurationChanged(int minutes);
 
 private:

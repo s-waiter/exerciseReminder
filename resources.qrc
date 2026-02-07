@@ -13,6 +13,9 @@
         <file>assets/qml/FluxChime.qml</file>
         <file>assets/qml/ScheduleListWindow.qml</file>
         <file>assets/qml/ReminderWindow.qml</file>
+        <file>assets/qml/DanmakuWindow.qml</file>
+        <file>assets/qml/DanmakuItem.qml</file>
+        <file>assets/qml/DanmakuEffectOverlay.qml</file>
         <file>assets/qml/ModernTextField.qml</file>
         <file>assets/qml/TypeButton.qml</file>
         <file>assets/qml/TimeInput.qml</file>

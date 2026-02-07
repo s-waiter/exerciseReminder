@@ -113,6 +113,24 @@ void AppConfig::setHourlyChimeEnabled(bool enabled)
 }
 
 // ========================================================================
+// 读取/设置：提醒模式
+// ========================================================================
+int AppConfig::reminderMode() const
+{
+    QSettings settings("TraeAI", "DeskCare");
+    return settings.value("reminderMode", 0).toInt(); // 0: Card (Default), 1: Danmaku
+}
+
+void AppConfig::setReminderMode(int mode)
+{
+    QSettings settings("TraeAI", "DeskCare");
+    if (reminderMode() != mode) {
+        settings.setValue("reminderMode", mode);
+        emit reminderModeChanged(mode);
+    }
+}
+
+// ========================================================================
 // 读取/设置：工作时长
 // ========================================================================
 int AppConfig::workDuration() const

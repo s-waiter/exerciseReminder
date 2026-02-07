@@ -44,6 +44,42 @@ Window {
     // Schedule Manager Windows
     // property var scheduleWin: null // Replaced by Loader
     property var activeReminderWindows: ({}) // Map<scheduleId, List<ReminderWindow>>
+    property var activeScheduleIds: [] // List<scheduleId> to maintain stack order
+
+    function updateReminderStacking() {
+        // Map<ScreenName, CurrentY>
+        // Use screen name as key to be robust against object reference changes
+        var currentYMap = {}
+        
+        // Iterate through active schedules in order
+        for (var i = 0; i < activeScheduleIds.length; i++) {
+            var id = activeScheduleIds[i]
+            var windows = activeReminderWindows[id]
+            
+            if (windows) {
+                for (var j = 0; j < windows.length; j++) {
+                    var win = windows[j]
+                    // Only stack ReminderCards (ignore Danmaku or others)
+                    // Also check if win has 'screen' property available
+                    if (win && win.isReminderCard && win.screen) {
+                        var screenName = win.screen.name
+                        
+                        // Initialize Y offset for this screen if not exists
+                        if (currentYMap[screenName] === undefined) {
+                            // Start from screen's virtualY + 30
+                            currentYMap[screenName] = win.screen.virtualY + 30
+                        }
+                        
+                        // Set target Y position
+                        win.y = currentYMap[screenName]
+                        
+                        // Increment offset for next card
+                        currentYMap[screenName] += win.height + 10 // 10px spacing
+                    }
+                }
+            }
+        }
+    }
 
     function openScheduleWindow() {
         if (scheduleLoader.active && scheduleLoader.item) {
@@ -65,68 +101,108 @@ Window {
     }
     
     function showReminder(title, type, message, id, options) {
-        // Always create a new instance for stacking multiple reminders
-        var component = Qt.createComponent("ReminderWindow.qml")
-        if (component.status === Component.Ready) {
-            var props = {
-                "titleStr": title,
-                "type": type,
-                "messageStr": message,
-                "scheduleId": id
+        var props = {
+            "titleStr": title,
+            "type": type,
+            "messageStr": message,
+            "scheduleId": id
+        }
+        if (options && options.forceMode) {
+            props["forceMode"] = true
+        }
+        
+        // Track ID order for stacking
+        var idStr = id.toString()
+        if (activeScheduleIds.indexOf(idStr) === -1) {
+            activeScheduleIds.push(idStr)
+        }
+        
+        // Initialize array for this schedule ID if not exists
+        if (!activeReminderWindows[id]) {
+            activeReminderWindows[id] = []
+        }
+
+        var screens = Qt.application.screens
+
+        // 1. Create Danmaku Reminder (If enabled) - Create FIRST so it's likely behind the card
+        if (appConfig.reminderMode === 1) {
+            var danmakuComponent = Qt.createComponent("DanmakuWindow.qml")
+            if (danmakuComponent.status === Component.Ready) {
+                var danmakuProps = Object.assign({}, props)
+                
+                // Create a danmaku window for EACH screen
+                for (var j = 0; j < screens.length; j++) {
+                    var danmakuScreen = screens[j]
+                    var screenDanmakuProps = Object.assign({}, danmakuProps)
+                    screenDanmakuProps["screen"] = danmakuScreen
+                    
+                    var danmakuWin = danmakuComponent.createObject(mainWindow, screenDanmakuProps)
+                    if (danmakuWin) {
+                        activeReminderWindows[id].push(danmakuWin)
+                        // Connect signals (Danmaku also triggers close/snooze)
+                        danmakuWin.snoozeRequested.connect(function(minutes) {
+                            scheduleManager.snoozeReminder(id, minutes)
+                            closeAllReminders(id)
+                        })
+                        danmakuWin.dismissRequested.connect(function() {
+                            closeAllReminders(id)
+                        })
+                        danmakuWin.show()
+                    }
+                }
+            } else {
+                console.error("Error loading DanmakuWindow:", danmakuComponent.errorString())
             }
-            if (options && options.forceMode) {
-                props["forceMode"] = true
+        }
+
+        // 2. Create Card Reminder (Always)
+        var cardComponent = Qt.createComponent("ReminderWindow.qml")
+        if (cardComponent.status === Component.Ready) {
+            var cardProps = Object.assign({}, props)
+            // If Danmaku mode (1) is enabled, use Mini Mode for the card
+            if (appConfig.reminderMode === 1) {
+                cardProps["miniMode"] = true
+            } else {
+                cardProps["miniMode"] = false
             }
             
-            // Initialize array for this schedule ID if not exists
-            if (!activeReminderWindows[id]) {
-                activeReminderWindows[id] = []
-            }
-
-            // Create a window for EACH screen
-            var screens = Qt.application.screens
+            // Create a card window for EACH screen
             for (var i = 0; i < screens.length; i++) {
                 var screen = screens[i]
+                var screenCardProps = Object.assign({}, cardProps)
+                screenCardProps["screen"] = screen
                 
-                // Clone props and add screen-specific properties if needed
-                // Note: ReminderWindow uses default positioning based on its own Screen attached property
-                // But we must explicitly set the 'screen' property of the Window
-                var screenProps = Object.assign({}, props)
-                screenProps["screen"] = screen
-                // Explicitly set position relative to the target screen
-                // ReminderWindow has logic: x: Screen.width - width - 30
-                // We need to ensure it uses the correct screen's dimensions
-                // Since 'screen' property is set, Screen.width inside ReminderWindow *should* be correct.
-                
-                var win = component.createObject(mainWindow, screenProps)
-                
-                if (win) {
-                    // Store reference
-                    activeReminderWindows[id].push(win)
-                    
+                var cardWin = cardComponent.createObject(mainWindow, screenCardProps)
+                if (cardWin) {
+                    activeReminderWindows[id].push(cardWin)
                     // Connect signals
-                    win.snoozeRequested.connect(function(minutes) {
+                    cardWin.snoozeRequested.connect(function(minutes) {
                         scheduleManager.snoozeReminder(id, minutes)
                         closeAllReminders(id)
                     })
-                    
-                    win.dismissRequested.connect(function() {
-                        // User clicked "I know"
-                        // Logic: Mark as completed or just close?
-                        // Usually just close. If completion logic is needed, call scheduleManager.
+                    cardWin.dismissRequested.connect(function() {
                         closeAllReminders(id)
                     })
-                    
-                    win.show()
-                    win.requestActivate()
+                    cardWin.show()
+                    cardWin.requestActivate() // Ensure card is active and on top
                 }
             }
         } else {
-            console.error("Error loading ReminderWindow:", component.errorString())
+            console.error("Error loading ReminderWindow:", cardComponent.errorString())
         }
+        
+        // Re-calculate positions to prevent overlap
+        updateReminderStacking()
     }
     
     function closeAllReminders(id) {
+        // Always try to remove from ID list first to prevent zombie IDs
+        var idStr = id.toString()
+        var idx = activeScheduleIds.indexOf(idStr)
+        if (idx !== -1) {
+            activeScheduleIds.splice(idx, 1)
+        }
+
         if (activeReminderWindows[id]) {
             var windows = activeReminderWindows[id]
             for (var i = 0; i < windows.length; i++) {
@@ -143,6 +219,9 @@ Window {
             // Clear the list
             delete activeReminderWindows[id]
         }
+        
+        // Re-stack remaining windows (Always update, as an ID removal might require shuffle)
+        updateReminderStacking()
     }
 
     Connections {
@@ -1573,6 +1652,8 @@ Window {
                     }
                 }
             }
+            
+
         }
         
         // 2. 状态/数据面板 (独立于 Column，定位在圆圈下方)
@@ -1987,22 +2068,28 @@ Window {
         anchors.fill: parent
         active: false
         source: "SettingsOverlay.qml"
-        z: 200
+        z: 999 // Ensure it's on top of everything
 
         function open() {
-            if (active) {
-                item.open()
-            } else {
+            if (!active) {
                 active = true
+            } else {
+                if (item) {
+                    item.open()
+                    item.visible = true
+                    item.raise()
+                }
             }
         }
 
         onLoaded: {
-            item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
-            item.open()
-            item.visibleChanged.connect(function() {
-                if (!item.visible) active = false
-            })
+            if (item) {
+                item.themeColor = Qt.binding(function() { return mainWindow.themeColor })
+                item.open()
+                item.visibleChanged.connect(function() {
+                    if (!item.visible) active = false
+                })
+            }
         }
     }
 
