@@ -1482,9 +1482,19 @@ Window {
             // 时间文本 (精致字体)
             Text {
                 text: {
-                    var m = Math.floor(workoutTimer.currentSessionDuration / 60)
-                    var s = workoutTimer.currentSessionDuration % 60
-                    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s)
+                    var totalSeconds = workoutTimer.currentSessionDuration
+                    var h = Math.floor(totalSeconds / 3600)
+                    var m = Math.floor((totalSeconds % 3600) / 60)
+                    var s = totalSeconds % 60
+
+                    var mm = m < 10 ? "0" + m : m
+                    var ss = s < 10 ? "0" + s : s
+
+                    if (h > 0) {
+                        return h + ":" + mm + ":" + ss
+                    } else {
+                        return mm + ":" + ss
+                    }
                 }
                 color: "#FFFFFF" 
                 // 使用 Light 细体字，增加现代感和精致感
