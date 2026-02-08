@@ -157,7 +157,8 @@ int main(int argc, char *argv[])
     // 连接午休模式信号，控制系统休眠状态
     // 当进入午休模式时阻止休眠，退出时恢复
     QObject::connect(&timerEngine, &TimerEngine::isNapModeChanged, &windowUtils, [&]() {
-        windowUtils.setPreventSleep(timerEngine.isNapMode());
+        // 使用明确的 reason 标识符，避免与 UI 层的控制冲突
+        windowUtils.setPreventSleep(timerEngine.isNapMode(), "TimerEngine_NapMode");
     });
 
     // ========================================================================

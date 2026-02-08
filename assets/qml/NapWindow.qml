@@ -28,11 +28,27 @@ Window {
     
     // 自动全屏逻辑
     onVisibleChanged: {
+        var reason = "NapWindow_" + napWin.toString()
         if (visible) {
+            // 阻止系统休眠
+            if (typeof windowUtils !== "undefined") {
+                 windowUtils.setPreventSleep(true, reason)
+            }
             showFullScreen()
             raise()
         } else {
+            // 恢复系统休眠
+            if (typeof windowUtils !== "undefined") {
+                 windowUtils.setPreventSleep(false, reason)
+            }
             resetExitState()
+        }
+    }
+
+    Component.onDestruction: {
+        var reason = "NapWindow_" + napWin.toString()
+        if (typeof windowUtils !== "undefined") {
+             windowUtils.setPreventSleep(false, reason)
         }
     }
 

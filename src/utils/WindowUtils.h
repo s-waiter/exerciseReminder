@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QWindow>
 #include <QVariantMap>
+#include <QSet>
 
 // ========================================================================
 // WindowUtils 类：窗口工具类
@@ -34,16 +35,23 @@ public:
     Q_INVOKABLE QVariantMap getScreenGeometryAtCursor();
 
     // 设置是否阻止系统休眠
-    // prevent: true = 阻止休眠 (用于午休模式等需要持续显示的场景)
-    // prevent: false = 恢复正常 (允许休眠)
-    Q_INVOKABLE void setPreventSleep(bool prevent);
+    // prevent: true = 阻止休眠
+    // prevent: false = 恢复正常
+    // reason: (可选) 阻止休眠的原因标识符，用于支持多个组件同时请求阻止休眠。
+    //         如果不提供 reason，则使用默认的全局开关 (兼容旧代码)。
+    Q_INVOKABLE void setPreventSleep(bool prevent, const QString &reason = "");
 
 signals:
     // 当系统会话状态改变时触发（true=锁屏, false=解锁）
     void sessionStateChanged(bool locked);
 
 private:
+    void updateSleepState();
+
     // 内部类，用于接收系统消息的隐藏窗口
     class SysMsgWindow;
     SysMsgWindow *m_sysMsgWindow;
+    
+    // 存储阻止休眠的原因集合
+    QSet<QString> m_preventSleepReasons;
 };

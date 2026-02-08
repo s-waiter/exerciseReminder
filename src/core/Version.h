@@ -3,10 +3,10 @@
 
 #include <QString>
 
-#define APP_VERSION "1.0.5"
+#define APP_VERSION "1.0.6"
 #define APP_VERSION_MAJOR 1
 #define APP_VERSION_MINOR 0
-#define APP_VERSION_PATCH 5
+#define APP_VERSION_PATCH 6
 
 class Version {
 public:

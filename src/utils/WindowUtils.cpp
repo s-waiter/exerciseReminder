@@ -191,21 +191,40 @@ QVariantMap WindowUtils::getScreenGeometryAtCursor() {
     return result;
 }
 
-void WindowUtils::setPreventSleep(bool prevent) {
-#ifdef Q_OS_WIN
+void WindowUtils::setPreventSleep(bool prevent, const QString &reason) {
+    QString key = reason.isEmpty() ? "default" : reason;
+
     if (prevent) {
+        if (!m_preventSleepReasons.contains(key)) {
+            m_preventSleepReasons.insert(key);
+            qDebug() << "WindowUtils: Added sleep blocker:" << key << "(Total:" << m_preventSleepReasons.size() << ")";
+        }
+    } else {
+        if (m_preventSleepReasons.contains(key)) {
+            m_preventSleepReasons.remove(key);
+            qDebug() << "WindowUtils: Removed sleep blocker:" << key << "(Total:" << m_preventSleepReasons.size() << ")";
+        }
+    }
+
+    updateSleepState();
+}
+
+void WindowUtils::updateSleepState() {
+#ifdef Q_OS_WIN
+    if (!m_preventSleepReasons.isEmpty()) {
         // ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
         // 阻止系统休眠并保持显示器开启
         SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-        qDebug() << "WindowUtils: System sleep prevented.";
+        // 为了避免日志刷屏，只有状态变化时才打印日志？或者总是打印当前状态？
+        // 鉴于这是一个关键操作，保持 debug 日志是有帮助的。
+        // qDebug() << "WindowUtils: System sleep PREVENTED. Blockers:" << m_preventSleepReasons;
     } else {
         // ES_CONTINUOUS
         // 清除之前的状态，恢复系统正常休眠策略
         SetThreadExecutionState(ES_CONTINUOUS);
-        qDebug() << "WindowUtils: System sleep restored.";
+        qDebug() << "WindowUtils: System sleep RESTORED (No blockers).";
     }
 #else
     // Linux/macOS implementation placeholder
-    Q_UNUSED(prevent);
 #endif
 }

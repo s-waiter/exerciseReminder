@@ -44,10 +44,11 @@ Window {
 
     // 窗口可见性改变时的逻辑
     onVisibleChanged: {
+        var reason = "OverlayWindow_" + overlayWin.toString()
         if(visible) {
             // 阻止系统休眠 (防止长时间运动时锁屏)
             if (typeof windowUtils !== "undefined") {
-                 windowUtils.setPreventSleep(true)
+                 windowUtils.setPreventSleep(true, reason)
             }
 
             // 确保几何属性正确 (防止多屏环境下的位置偏移)
@@ -77,12 +78,20 @@ Window {
             // 重启动画
             mainEntranceAnim.restart()
         } else {
-            // 恢复系统休眠
+            // 恢复系统休眠 (移除对应的 blocker)
             if (typeof windowUtils !== "undefined") {
-                 windowUtils.setPreventSleep(false)
+                 windowUtils.setPreventSleep(false, reason)
             }
             // 隐藏时重置状态
             feedbackText = ""
+        }
+    }
+
+    // 销毁时务必清理，防止泄露
+    Component.onDestruction: {
+        var reason = "OverlayWindow_" + overlayWin.toString()
+        if (typeof windowUtils !== "undefined") {
+             windowUtils.setPreventSleep(false, reason)
         }
     }
 
