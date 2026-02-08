@@ -1422,4 +1422,98 @@ Window {
         toastShowAnim.restart()
         toastTimer.restart()
     }
+
+    // ========================================================================
+    // 实时运动计时器 (Real-time Workout Timer)
+    // ========================================================================
+    // 低调显示当前运动时长，满足用户控制运动时间的需求 (10/15/20分钟)
+    Item {
+        id: workoutTimer
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 40 // 保持一定的呼吸感
+        width: timerRow.width + 40 // 增加一点宽度余量
+        height: 36
+        z: 999 // 略低于 mouseTracker (1000) 和 feedbackLayer (1001)
+        visible: overlayWin.visible && !feedbackLayer.visible // 仅在运动中显示，结算时不显示
+        
+        // 玻璃拟态背景 (精致胶囊风格)
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            // 使用稍微深一点的背景，增加对比度，避免看起来“简陋”
+            color: "#40000000" 
+            border.color: Qt.rgba(1, 1, 1, 0.1) // 极细的白色描边
+            border.width: 1
+            
+            // 极其微弱的阴影，提升层次感
+            layer.enabled: true
+            layer.effect: DropShadow {
+                transparentBorder: true
+                horizontalOffset: 0
+                verticalOffset: 2
+                radius: 8
+                samples: 16
+                color: "#40000000"
+            }
+        }
+
+        Row {
+            id: timerRow
+            anchors.centerIn: parent
+            spacing: 12 // 增加间距，更显大气
+
+            // 动态呼吸的图标点 (替代复杂的时钟图标，更极简)
+            Rectangle {
+                width: 6
+                height: 6
+                radius: 3
+                color: (currentTheme && currentTheme.gradientEnd) ? currentTheme.gradientEnd : "#00FFFF" // 跟随主题色，增加非空保护
+                anchors.verticalCenter: parent.verticalCenter
+                
+                SequentialAnimation on opacity {
+                    running: workoutTimer.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.3; duration: 1500; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1.0; duration: 1500; easing.type: Easing.InOutSine }
+                }
+            }
+
+            // 时间文本 (精致字体)
+            Text {
+                text: {
+                    var m = Math.floor(workoutTimer.currentSessionDuration / 60)
+                    var s = workoutTimer.currentSessionDuration % 60
+                    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s)
+                }
+                color: "#FFFFFF" 
+                // 使用 Light 细体字，增加现代感和精致感
+                font.pixelSize: 16
+                font.family: "Segoe UI" 
+                font.weight: Font.Light 
+                font.letterSpacing: 2 // 增加字间距，提升高级感
+                
+                // 确保数字对齐，防止跳动 (如果字体支持 Monospace 更好，这里用 Segoe UI Light + 固定宽度逻辑通常足够)
+                horizontalAlignment: Text.AlignHCenter
+                
+                style: Text.Outline 
+                styleColor: "#20000000" // 极淡的阴影描边
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+
+        // 计时逻辑
+        property int currentSessionDuration: 0
+        Timer {
+            interval: 1000
+            repeat: true
+            running: workoutTimer.visible
+            onTriggered: {
+                if (overlayWin.showTime) {
+                    var now = new Date()
+                    workoutTimer.currentSessionDuration = Math.floor((now - overlayWin.showTime) / 1000)
+                }
+            }
+        }
+    }
 }
