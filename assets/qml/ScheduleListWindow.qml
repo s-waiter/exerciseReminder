@@ -18,6 +18,37 @@ Window {
     height: 720
     visible: false
     title: "提醒"
+
+    // Auto-center with slight left offset when shown
+    onVisibleChanged: {
+        if (visible) {
+            // Get screen geometry at cursor position
+            // This ensures window appears on the correct monitor
+            var geo = windowUtils.getScreenGeometryAtCursor()
+            
+            if (geo) {
+                var availW = geo.width
+                var availH = geo.height
+                var startX = geo.x
+                var startY = geo.y
+                
+                // Calculate centered position
+                // Note: width is dynamic, so we use current width
+                var centerX = startX + (availW - width) / 2
+                var centerY = startY + (availH - height) / 2
+                
+                // Apply slight offset to the left (e.g., 100px)
+                // This makes the "Reminder" window distinct from "Activity" window
+                x = centerX - 100
+                y = centerY
+            } else {
+                // Fallback to primary screen center with offset
+                x = (Screen.width - width) / 2 - 100
+                y = (Screen.height - height) / 2
+            }
+            requestActivate()
+        }
+    }
     flags: Qt.FramelessWindowHint | Qt.Window
     color: "transparent"
 
