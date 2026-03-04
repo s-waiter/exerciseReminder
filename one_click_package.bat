@@ -151,7 +151,7 @@ echo.
 set /p DEPLOY_NOW="Do you want to deploy to server? (Y/N): "
 if /i "%DEPLOY_NOW%"=="Y" (
     echo [DEPLOY] Starting deployment...
-    "C:\Users\admin\anaconda3\python.exe" website_project/deploy.py
+    python deploy_full.py app
 )
 
 pause

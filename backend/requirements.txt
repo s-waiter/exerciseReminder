@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+geoip2
+requests
+aiofiles
+jinja2
+paramiko
+user-agents
