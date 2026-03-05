@@ -74,12 +74,12 @@ def get_location(ip: str) -> str:
                 response = reader.city(ip)
                 # Local DB usually returns English names or names map
                 # We need to handle language. GeoIP2 has names map.
-                city = response.city.names.get('zh-CN', response.city.name)
-                country = response.country.names.get('zh-CN', response.country.name)
+                city = response.city.names.get('zh-CN', response.city.name) or ""
+                country = response.country.names.get('zh-CN', response.country.name) or ""
                 # Region/Subdivision
                 region = ""
                 if response.subdivisions.most_specific:
-                     region = response.subdivisions.most_specific.names.get('zh-CN', response.subdivisions.most_specific.name)
+                     region = response.subdivisions.most_specific.names.get('zh-CN', response.subdivisions.most_specific.name) or ""
 
                 return format_location(country, region, city)
         except Exception as e:
@@ -101,6 +101,11 @@ def get_location(ip: str) -> str:
                 region = data.get('regionName', '') # Province/State
                 country = data.get('country', '')
                 
+                # SPECIAL FIX: ip-api sometimes returns district level names for municipalities
+                # e.g. regionName="Shanghai", city="Changning" -> We want "Shanghai"
+                if region in ["Beijing", "Shanghai", "Tianjin", "Chongqing", "北京", "上海", "天津", "重庆"]:
+                    city = region
+
                 return format_location(country, region, city)
                      
     except Exception as e:
@@ -117,6 +122,10 @@ def get_location(ip: str) -> str:
                 city = data.get('city', '')
                 region = data.get('region', '')
                 country = data.get('country', '')
+                
+                # SPECIAL FIX: same logic for ipwhois
+                if region in ["Beijing", "Shanghai", "Tianjin", "Chongqing", "北京", "上海", "天津", "重庆"]:
+                    city = region
                 
                 return format_location(country, region, city)
 
