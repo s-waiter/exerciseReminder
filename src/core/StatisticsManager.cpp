@@ -8,6 +8,8 @@
 #include <QTimer>
 #include <QDebug>
 #include <QUrlQuery>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 StatisticsManager::StatisticsManager(QObject *parent) : QObject(parent) {
     m_networkManager = new QNetworkAccessManager(this);
@@ -49,22 +51,24 @@ void StatisticsManager::reportUsage() {
     QString uid = getMachineId();
     QString version = Version::getCurrentVersion();
     
-    // 构造 URL 参数
+    // 构造 JSON 数据
+    QJsonObject json;
+    json["uid"] = uid;
+    json["version"] = version;
+    
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
     QUrl url(REPORT_URL);
-    QUrlQuery query;
-    query.addQueryItem("uid", uid);
-    query.addQueryItem("ver", version);
-    query.addQueryItem("app", "DeskCare");
-    url.setQuery(query);
-
     QNetworkRequest request(url);
-    // 设置 User-Agent 方便日志识别
+    // 设置请求头
     request.setHeader(QNetworkRequest::UserAgentHeader, "DeskCare-Client/1.0");
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    qDebug() << "Reporting stats to:" << url.toString();
+    qDebug() << "Reporting stats to:" << REPORT_URL;
 
-    // 发送 GET 请求
-    QNetworkReply *reply = m_networkManager->get(request);
+    // 发送 POST 请求
+    QNetworkReply *reply = m_networkManager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         onReportFinished(reply);
         reply->deleteLater();

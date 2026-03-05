@@ -115,20 +115,18 @@ def deploy_frontend_only(client, sftp):
 
     # 2. Upload to backend static folder on server
     print("Uploading static files...")
-    # The structure on server is /opt/deskcare/static (root level) not /opt/deskcare/app/static
-    # Let's check main.py logic: 
-    # static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-    # if main.py is in /opt/deskcare/app/main.py, then dirname(main.py) is /opt/deskcare/app
-    # dirname(/opt/deskcare/app) is /opt/deskcare
-    # so static_dir is /opt/deskcare/static
     
-    # So we should upload to /opt/deskcare/static
-    
+    # Ensure static dir exists
+    run_remote(client, f"mkdir -p {REMOTE_BASE}/static", True)
     # Clean remote static dir
     run_remote(client, f"rm -rf {REMOTE_BASE}/static/*", True)
-    run_remote(client, f"mkdir -p {REMOTE_BASE}/static", True)
     
     upload_dir(sftp, DIST_DIR, f"{REMOTE_BASE}/static")
+    
+    # Restart backend to ensure it picks up any new static file types or mounts if necessary
+    print("Restarting backend service to refresh static files...")
+    run_remote(client, "systemctl restart deskcare", True)
+    
     print("Frontend deployment complete.")
 
 def deploy_backend_only(client, sftp):
@@ -140,47 +138,38 @@ def deploy_backend_only(client, sftp):
     
     # 2. Upload Code
     print("Uploading backend code...")
-    # We only update app code, requirements, run.py. We do NOT touch 'files' or 'static'
-    run_remote(client, f"rm -rf {REMOTE_BASE}/app/*.py", True) # Clean py files but keep static/ dir? No, static is inside app usually
-    # To be safe: clean app code but keep static if it exists
-    # Actually, standard structure is app/static. If we wipe app/, we wipe static.
-    # So if we deploy backend only, we must re-upload static OR be careful.
-    # Strategy: Upload app/ code but exclude static folder locally? 
-    # Or just overwrite.
+    # Clean remote app code (EXCLUDING static directory)
+    # We use a safer way to clean: find and delete only .py files and subdirs except 'static'
+    run_remote(client, f"find {REMOTE_BASE}/app -maxdepth 1 -name '*.py' -delete", True)
     
-    # Let's upload app folder but skip static locally if it's empty
-    # Better: just upload everything in app/ except static if we don't want to touch it.
-    # But usually backend deploy might include new static logic.
-    # Let's assume backend deploy updates python code.
+    # Local backend/app path
+    local_app_dir = os.path.join(BACKEND_DIR, "app")
+    remote_app_dir = f"{REMOTE_BASE}/app"
     
-    # Upload app dir (excluding static if not present locally, but local backend/app/static is usually empty or gitkept)
-    # To avoid deleting remote static (which holds the website), we should be careful.
-    # Remote structure: /opt/deskcare/app/static (website)
-    # Local structure: backend/app/static (empty or build artifact)
+    # Create remote app dir if not exists
+    run_remote(client, f"mkdir -p {remote_app_dir}", True)
+
+    # Upload everything from local app/ to remote app/
+    # But we want to be CAREFUL not to wipe the remote static folder if it's the website
+    # Local backend/app/static is usually empty or doesn't exist.
     
-    # Safe approach: Upload file by file for app/ root, and subdirs.
-    # Or just use rsync logic. Since we use paramiko, let's just upload app/ 
-    # BUT we need to make sure we don't wipe /app/static on remote if local is empty.
-    
-    # Let's iterate local backend/app
-    local_app = os.path.join(BACKEND_DIR, "app")
-    remote_app = f"{REMOTE_BASE}/app"
-    
-    for item in os.listdir(local_app):
-        if item == "static": continue # Skip static folder when deploying backend code only
+    items = os.listdir(local_app_dir)
+    for item in items:
         if item == "__pycache__": continue
+        if item == "static": continue # Skip static, it's handled by frontend deploy or exists on server
         
-        l_path = os.path.join(local_app, item)
-        r_path = f"{remote_app}/{item}"
+        local_path = os.path.join(local_app_dir, item)
+        remote_path = f"{remote_app_dir}/{item}"
         
-        if os.path.isfile(l_path):
+        if os.path.isfile(local_path):
             print(f"Uploading {item}...")
-            sftp.put(l_path, r_path)
-        elif os.path.isdir(l_path):
-            upload_dir(sftp, l_path, r_path)
-            
-    # Upload root files
-    root_files = ["run.py", "requirements.txt", "alembic.ini"]
+            sftp.put(local_path, remote_path)
+        elif os.path.isdir(local_path):
+            # For subdirectories like 'routers', 'core', we can just upload
+            upload_dir(sftp, local_path, remote_path)
+
+    # Upload root level files
+    root_files = ["run.py", "requirements.txt", "create_db.py", "reset_schema.py", "update_schema.py"]
     for f in root_files:
         local_p = os.path.join(BACKEND_DIR, f)
         if os.path.exists(local_p):
@@ -189,34 +178,83 @@ def deploy_backend_only(client, sftp):
 
     # 3. Update Dependencies
     print("Checking dependencies...")
+    # Using the virtualenv on server
     run_remote(client, f"{REMOTE_BASE}/venv/bin/pip install -r {REMOTE_BASE}/requirements.txt")
+    
+    # 3.1 Setup Database
+    # We only run create_db.py to ensure tables exist, but NEVER reset/drop tables in normal deploy
+    print("Ensuring database tables exist...")
+    out_create = run_remote(client, f"cd {REMOTE_BASE} && {REMOTE_BASE}/venv/bin/python create_db.py")
+    print(out_create)
+    
+    # 3.2 Update Schema (Safe Migration)
+    print("Updating database schema (if needed)...")
+    out_update = run_remote(client, f"cd {REMOTE_BASE} && {REMOTE_BASE}/venv/bin/python update_schema.py")
+    print(out_update)
+    
+    # DANGEROUS: Do NOT run reset_schema.py unless explicitly requested!
+    # out_reset = run_remote(client, f"cd {REMOTE_BASE} && {REMOTE_BASE}/venv/bin/python reset_schema.py")
+    # print(out_reset)
     
     # 4. Restart Service
     print("Restarting service...")
     run_remote(client, "systemctl daemon-reload")
     run_remote(client, "systemctl restart deskcare")
     
+    # Force reload again to pick up new directories
+    time.sleep(2)
+    run_remote(client, "systemctl restart deskcare")
+    
     # 5. Verify
     print("Verifying deployment...")
-    time.sleep(5) # Wait for service to start
-    status = run_remote(client, "systemctl is-active deskcare")
+    status = run_remote(client, "systemctl is-active deskcare", True)
     print(f"Service status: {status}")
     
-    if status.strip() != "active":
-        print("Error: Service is not active. Fetching logs...")
-        run_remote(client, "journalctl -u deskcare -n 20 --no-pager", True)
-    else:
-        # Check API health
+    # API Check (Health Check)
+    print("Performing API Health Check...")
+    
+    # 1. Local Check (on server) - This checks if the service itself started correctly
+    print("1. Server Self-Check (curl localhost)...")
+    # Wait a bit for service to start
+    time.sleep(5)
+    
+    # Try port 80 first, then 8000
+    local_check = run_remote(client, "curl -s -o /dev/null -w '%{http_code}' http://localhost:80/api/status", True)
+    target_port = 80
+    
+    if local_check != "200":
+        print("   Port 80 check failed, trying port 8000...")
+        local_check = run_remote(client, "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/status", True)
+        target_port = 8000
+    
+    if local_check == "200":
+        print(f"✅ Service is running internally on port {target_port}.")
+        
+        # 2. Remote Check (from YOUR computer to Cloud Server)
+        print(f"2. Public Access Check (http://{HOST}:{target_port})...")
         try:
             import urllib.request
-            resp = urllib.request.urlopen(f"http://{HOST}/docs", timeout=10)
-            if resp.status == 200:
-                print(f"API Check: OK (http://{HOST}/docs)")
-            else:
-                print(f"API Check: Failed (Status {resp.status})")
+            # Check public IP
+            with urllib.request.urlopen(f"http://{HOST}:{target_port}/api/status", timeout=5) as response:
+                if response.status == 200:
+                    print("✅ Public access successful!")
+                else:
+                    print(f"⚠️  Public access returned status {response.status}.")
         except Exception as e:
-             print(f"API Check: Failed ({e})")
-    
+            print(f"❌ Public access failed: {e}")
+            print("   Possible causes:")
+            print(f"   - Cloud Provider Firewall (Security Group) blocks port {target_port}")
+            print(f"   - Server Firewall (UFW/iptables) blocks port {target_port}")
+            print(f"   Action: Please open TCP port {target_port} in your cloud console.")
+            
+    else:
+        print(f"❌ Service failed to start (Internal Check: {local_check}).")
+        print("Fetching service logs...")
+        logs = run_remote(client, "journalctl -u deskcare -n 50 --no-pager", True)
+        print("========== SERVICE LOGS ==========")
+        print(logs)
+        print("==================================")
+
     print("Backend deployment complete.")
 
 def get_latest_zip():

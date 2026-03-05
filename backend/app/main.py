@@ -1,55 +1,35 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .routers import analytics, downloads, backup, updates, dashboard
+from fastapi.responses import FileResponse, JSONResponse
+from .routers import analytics, downloads, backup, updates, admin
 from .database import engine, Base, SessionLocal
-from sqlalchemy import text
+from . import crud, schemas
 import os
-
-# Database Migration Helper
-def run_migrations():
-    # Simple migration to add columns if they don't exist
-    db = SessionLocal()
-    try:
-        # MySQL migration check
-        result = db.execute(text("SHOW COLUMNS FROM website_visits")).fetchall()
-        columns = [row[0] for row in result]
-            
-        # Helper to add column safely
-        def add_column_safe(col_name, col_type):
-            if col_name not in columns:
-                print(f"Migrating: Adding {col_name} column...")
-                try:
-                    db.execute(text(f"ALTER TABLE website_visits ADD COLUMN {col_name} {col_type}"))
-                    db.commit()
-                except Exception as ex:
-                    print(f"Error adding {col_name}: {ex}")
-                    db.rollback()
-
-        if columns: # Only run if table exists
-            add_column_safe("referrer", "VARCHAR(255)")
-            add_column_safe("os", "VARCHAR(255)")
-            add_column_safe("browser", "VARCHAR(255)")
-            add_column_safe("device_type", "VARCHAR(255)")
-            add_column_safe("duration_seconds", "INTEGER DEFAULT 0")
-            add_column_safe("is_downloaded", "BOOLEAN DEFAULT 0")
-            add_column_safe("downloaded_version", "VARCHAR(255)")
-            
-    except Exception as e:
-        print(f"Migration warning: {e}")
-        # If table doesn't exist, create_all will handle it later, so this exception is fine for first run
-    finally:
-        db.close()
+import hashlib
+from typing import Optional
 
 # Ensure tables exist
 Base.metadata.create_all(bind=engine)
-# Run migrations for existing tables
-run_migrations()
+
+# Create Default Admin if not exists
+def create_default_admin():
+    db = SessionLocal()
+    try:
+        if not crud.get_admin_user(db, "root"):
+            print("Creating default admin user (root)...")
+            crud.create_admin_user(db, schemas.AdminLogin(username="root", password="pass"))
+    except Exception as e:
+        print(f"Error creating default admin: {e}")
+    finally:
+        db.close()
+
+create_default_admin()
 
 app = FastAPI(
     title="DeskCare Backend API",
-    description="API for DeskCare Application (Analytics, Updates, Backup)",
-    version="1.0.0"
+    description="API for DeskCare Application (Analytics, Updates, Backup, Admin)",
+    version="2.0.0"
 )
 
 # CORS
@@ -61,26 +41,89 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/api/status")
+async def status():
+    return {"status": "ok", "message": "DeskCare Backend Running v2.0"}
+
 app.include_router(analytics.router)
-app.include_router(analytics.legacy_router)
 app.include_router(downloads.router)
 app.include_router(backup.router)
 app.include_router(updates.router)
-app.include_router(dashboard.router)
+app.include_router(admin.router)
 
 # Serve Files Directory (Downloads)
-# Allow public access to /files for zip downloads
-# Mount /files BEFORE / to avoid being shadowed by the root static mount
 files_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "files")
-if os.path.exists(files_dir):
-    app.mount("/files", StaticFiles(directory=files_dir), name="files")
+if not os.path.exists(files_dir):
+    os.makedirs(files_dir)
+app.mount("/files", StaticFiles(directory=files_dir), name="files")
 
-# Serve Static Files (Frontend)
-# If 'static' folder exists, serve it at root
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+# Serve Frontend (SPA)
+# Handle both local dev (../../frontend/dist) and server deployment (/opt/deskcare/static)
+# NOTE: os.path.dirname(__file__) is backend/app
+# Server: /opt/deskcare/app/main.py -> static is /opt/deskcare/static (one level up from app)
+# Local: backend/app/main.py -> static is backend/static (one level up from app)
+server_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+# Local dev frontend/dist
+local_static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend", "dist")
 
-@app.get("/api/status")
-async def status():
-    return {"status": "ok", "message": "DeskCare Backend Running"}
+static_dir = None
+if os.path.exists(server_static_dir):
+    static_dir = server_static_dir
+elif os.path.exists(local_static_dir):
+    static_dir = local_static_dir
+
+if static_dir:
+    # Ensure static directories exist to avoid mount errors
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+        
+    assets_dir = os.path.join(static_dir, "assets")
+    if not os.path.exists(assets_dir):
+        os.makedirs(assets_dir)
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    
+    images_dir = os.path.join(static_dir, "images")
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+    app.mount("/images", StaticFiles(directory=images_dir), name="images")
+    
+    # Explicit Root Handler
+    @app.get("/")
+    async def serve_root():
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
+
+    # Catch-all for SPA and Root Static Files
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # IMPORTANT: Explicitly ignore API routes in catch-all to prevent 404 hijacking
+        # Check against both "/api" and "api" (for different URL formats)
+        path_parts = full_path.strip("/").split("/")
+        if path_parts and path_parts[0] in ["api", "files", "updates"]:
+             return JSONResponse(status_code=404, content={"detail": f"Route /{full_path} not found in API"})
+        
+        # 1. Try to serve exact file match (e.g. vite.svg, robots.txt, favicon.ico)
+        # Security check: ensure path is within static_dir
+        # Also remove any leading slashes to prevent absolute path traversal
+        clean_path = full_path.lstrip("/")
+        if not clean_path: # Root path handled by index.html logic below
+             pass
+        else:
+            file_path = os.path.abspath(os.path.join(static_dir, clean_path))
+            if os.path.commonprefix([file_path, os.path.abspath(static_dir)]) == os.path.abspath(static_dir):
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    return FileResponse(file_path)
+             
+        # 2. Serve index.html for all other routes (SPA) - BUT ONLY if it's not a static resource request
+        # If request ends with typical extensions, return 404 instead of index.html
+        # This prevents 404 images from returning HTML
+        ext = os.path.splitext(full_path)[1].lower()
+        if ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.css', '.js', '.json', '.ico', '.map', '.woff', '.woff2', '.ttf']:
+             return JSONResponse(status_code=404, content={"detail": "File not found"})
+
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})

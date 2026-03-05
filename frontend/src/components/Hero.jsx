@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Download, ChevronRight, AlertTriangle, Clock, Activity } from 'lucide-react';
+import { Download, ChevronRight, Clock, Activity } from 'lucide-react';
 import ParticleBackground from './ParticleBackground';
 import { useVersionInfo } from '../hooks/useVersionInfo';
 
-const Hero = ({ trackDownload }) => {
-  const { version, downloadUrl, loading } = useVersionInfo();
+const Hero = ({ onDownloadClick }) => {
+  const { version, loading } = useVersionInfo();
   const targetRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: targetRef,
@@ -13,7 +13,6 @@ const Hero = ({ trackDownload }) => {
   });
 
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-  const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
   const y = useTransform(scrollYProgress, [0, 0.5], [0, -50]);
 
   return (
@@ -80,11 +79,14 @@ const Hero = ({ trackDownload }) => {
                   加载版本信息...
                </button>
             ) : (
-              <a href={downloadUrl || "#"} download={!!downloadUrl} onClick={() => trackDownload && trackDownload(version)} className={`group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden shadow-lg shadow-teal-900/50 hover:shadow-teal-500/30 ${!downloadUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
+              <button 
+                onClick={onDownloadClick}
+                className="group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden shadow-lg shadow-teal-900/50 hover:shadow-teal-500/30"
+              >
                  <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 ease-out transform translate-x-full translate-y-full bg-gradient-to-br from-teal-400 to-cyan-300 group-hover:mb-32 group-hover:mr-0 group-hover:translate-x-0 group-hover:translate-y-0 opacity-30"></span>
                  <Download className="mr-2 h-5 w-5 group-hover:animate-bounce" />
                  免费下载 Windows 版
-              </a>
+              </button>
             )}
             <a href="#features" className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-slate-300 transition-all duration-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white backdrop-blur-sm">
               探索功能 <ChevronRight className="ml-1 h-5 w-5" />
@@ -98,43 +100,36 @@ const Hero = ({ trackDownload }) => {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="mt-8 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 backdrop-blur-sm text-left max-w-lg mx-auto lg:mx-0"
           >
-            <div className="flex gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-amber-100/90">
-                <p className="font-medium text-amber-200 mb-1">安装提示</p>
-                <p className="leading-relaxed text-xs">
-                  若 Windows 提示 <span className="text-white font-semibold">"已保护你的电脑"</span>，
-                  请点击 <span className="text-white font-semibold">更多信息</span> &rarr; <span className="text-white font-semibold">仍要运行</span>。
-                  (软件纯净无毒，暂未购买商业证书)
-                </p>
-              </div>
-            </div>
+             <p className="text-amber-200/80 text-sm flex items-start gap-2">
+               <span className="mt-0.5 text-amber-400">⚠️</span>
+               <span>
+                 <strong>安装提示：</strong> 若 Windows SmartScreen 提示拦截，请点击 <span className="underline decoration-amber-500/50 underline-offset-2">更多信息</span> &rarr; <span className="underline decoration-amber-500/50 underline-offset-2">仍要运行</span> 即可正常安装。
+               </span>
+             </p>
           </motion.div>
         </motion.div>
 
-        {/* Right Content - 3D Mockup */}
+        {/* Right Visual - 3D Mockup */}
         <motion.div 
-          style={{ scale }}
-          initial={{ opacity: 0, x: 50, rotateY: -10 }}
-          animate={{ opacity: 1, x: 0, rotateY: 0 }}
-          transition={{ duration: 1, delay: 0.2 }}
-          className="hidden lg:block relative perspective-1000"
+           initial={{ opacity: 0, x: 50 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ duration: 1, delay: 0.2 }}
+           className="relative hidden lg:block"
         >
-          <div className="relative z-10 transform transition-transform duration-500 hover:rotate-y-2 hover:rotate-x-2 preserve-3d">
-            {/* Glow Effect */}
-            <div className="absolute inset-0 bg-teal-500/20 blur-3xl rounded-full transform scale-90 translate-y-10"></div>
-            
-            {/* Main Window Mockup */}
-            <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700/50">
-               <div className="h-8 bg-slate-800 flex items-center px-4 gap-2 border-b border-slate-700">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <div className="relative w-full max-w-lg mx-auto perspective-1000 group">
+               {/* Main Window Mockup */}
+               <div className="relative bg-slate-800 rounded-xl shadow-2xl overflow-hidden border border-slate-700 transform transition-transform duration-500 group-hover:rotate-y-2 group-hover:rotate-x-2">
+                  <div className="h-8 bg-slate-900 border-b border-slate-700 flex items-center px-4 gap-2">
+                     <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                     <div className="w-3 h-3 rounded-full bg-amber-500/80"></div>
+                     <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                  </div>
+                  <img src="/images/screenshot-main.png" alt="DeskCare Dashboard" className="w-full h-auto opacity-90 group-hover:opacity-100 transition-opacity" />
                </div>
-               <img src="/images/screenshot-main.png" alt="DeskCare Main Interface" className="w-full h-auto object-cover opacity-90 hover:opacity-100 transition-opacity" />
                
+               {/* Background Glow behind image */}
+               <div className="absolute -inset-4 bg-teal-500/20 blur-3xl -z-10 rounded-full opacity-60"></div>
             </div>
-          </div>
         </motion.div>
       </div>
     </div>

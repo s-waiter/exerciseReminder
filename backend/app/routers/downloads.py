@@ -1,104 +1,99 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Body
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from .. import crud, models, schemas
 from ..database import get_db, SessionLocal
-from ..core.geolocation import get_location
 import os
 from datetime import datetime
 import uuid
 
 router = APIRouter(
-    prefix="/download",
+    prefix="/api/downloads",
     tags=["download"]
 )
 
 # Configuration: Path to the installer
 # Ensure this directory exists and contains the installer
-DOWNLOAD_FILE_PATH = os.path.join("files", "DeskCare_Setup.exe")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DOWNLOAD_FILE_PATH = os.path.join(BASE_DIR, "files", "DeskCare_Setup.zip") 
 
-def log_download_bg(key_id: int, ip: str, version: str):
-    db = SessionLocal()
-    try:
-        location = get_location(ip)
-        log = schemas.DownloadLogCreate(
-            key_id=key_id,
-            ip_address=ip,
-            geo_location=location,
-            version=version
-        )
-        crud.create_download_log(db, log)
-    except Exception as e:
-        print(f"Error logging download: {e}")
-    finally:
-        db.close()
+@router.get("/status")
+def get_download_status(db: Session = Depends(get_db)):
+    config = crud.get_system_config(db, "require_download_code")
+    return {"require_code": config.value == "true" if config else True}
 
-def mark_key_bg(key_id: int):
+@router.post("/verify")
+def verify_code(code: str = Body(None, embed=True), db: Session = Depends(get_db)):
+    # 1. Check Global Config
+    config = crud.get_system_config(db, "require_download_code")
+    require_code = config.value == "true" if config else True
+    
+    if not require_code:
+        # If no code required, allow download immediately
+        # Use a special 'public' code or just bypass
+        return {"status": "valid", "download_url": "/api/downloads/file?code=public_access"}
+
+    # 2. Verify Code
+    if not code:
+        raise HTTPException(status_code=400, detail="请输入下载码")
+
+    db_key = crud.get_download_key(db, code)
+    if not db_key:
+        raise HTTPException(status_code=400, detail="无效的下载码")
+    
+    if db_key.is_used and db_key.type == "one_time":
+        raise HTTPException(status_code=400, detail="此下载码已被使用")
+        
+    if db_key.type == "time_limited" and db_key.expires_at and datetime.now() > db_key.expires_at:
+        raise HTTPException(status_code=400, detail="此下载码已过期")
+
+    if db_key.max_uses and (db_key.usage_count or 0) >= db_key.max_uses:
+        raise HTTPException(status_code=400, detail="此下载码已达到最大使用次数")
+
+    return {"status": "valid", "download_url": f"/api/downloads/file?code={code}"}
+
+@router.get("/file")
+async def download_file(code: str, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # 1. Check Global Config first
+    config = crud.get_system_config(db, "require_download_code")
+    require_code = config.value == "true" if config else True
+    
+    if not require_code and code == "public_access":
+         if not os.path.exists(DOWNLOAD_FILE_PATH):
+            return JSONResponse(status_code=404, content={"detail": "安装包文件未找到"})
+         return FileResponse(DOWNLOAD_FILE_PATH, media_type="application/zip", filename="DeskCare_Setup.zip")
+
+    # 2. Verify Code
+    db_key = crud.get_download_key(db, code)
+    
+    if not db_key:
+         return JSONResponse(status_code=403, content={"detail": "无效的下载码"})
+    
+    if db_key.is_used and db_key.type == "one_time":
+         return JSONResponse(status_code=403, content={"detail": "此下载码已被使用"})
+
+    if db_key.type == "time_limited" and db_key.expires_at and datetime.now() > db_key.expires_at:
+         return JSONResponse(status_code=403, content={"detail": "此下载码已过期"})
+
+    if db_key.max_uses and (db_key.usage_count or 0) >= db_key.max_uses:
+         return JSONResponse(status_code=403, content={"detail": "此下载码已达到最大使用次数"})
+
+    if not os.path.exists(DOWNLOAD_FILE_PATH):
+        # Fallback for dev
+        return JSONResponse(status_code=404, content={"detail": "安装包文件未找到 (Dev Note: Place DeskCare_Setup.zip in backend/files/)"})
+
+    # Mark as used (increments count, sets is_used if one_time)
+    crud.mark_key_used(db, db_key, request.client.host)
+
+    return FileResponse(DOWNLOAD_FILE_PATH, media_type="application/zip", filename="DeskCare_Setup.zip")
+
+def mark_key_bg(key_id: int, ip: str):
     db = SessionLocal()
     try:
         key = db.query(models.DownloadKey).filter(models.DownloadKey.id == key_id).first()
         if key:
-            key.is_used = True
-            key.used_at = datetime.now()
-            db.commit()
+            crud.mark_key_used(db, key, ip)
+    except Exception as e:
+        print(f"Error marking key: {e}")
     finally:
         db.close()
-
-@router.get("/{key}")
-async def download_file(key: str, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    db_key = crud.get_download_key(db, key)
-    
-    if not db_key:
-        raise HTTPException(status_code=403, detail="无效的下载秘钥 (Invalid Key)")
-    
-    if db_key.is_used:
-        # Option: Allow re-download within X hours? Or just strict one-time?
-        # For now, strict one-time but maybe warn user.
-        # But if download fails, user is stuck.
-        # Better: Allow multiple downloads, but log all.
-        # If strict policy required:
-        # raise HTTPException(status_code=410, detail="此秘钥已被使用 (Key Already Used)")
-        pass
-
-    # Check file existence
-    if not os.path.exists(DOWNLOAD_FILE_PATH):
-        raise HTTPException(status_code=404, detail="安装包文件未找到 (File Not Found)")
-
-    # Mark as used (if first time)
-    if not db_key.is_used:
-        background_tasks.add_task(mark_key_bg, db_key.id)
-
-    # Log the download
-    client_ip = request.client.host
-    version = "latest" # TODO: Read from version file
-    background_tasks.add_task(log_download_bg, db_key.id, client_ip, version)
-
-    return FileResponse(DOWNLOAD_FILE_PATH, media_type="application/octet-stream", filename="DeskCare_Setup.exe")
-
-@router.post("/generate_key")
-async def generate_key(admin_secret: str, count: int = 1, db: Session = Depends(get_db)):
-    # Simple admin check
-    if admin_secret != "TraeAdmin2026": 
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    
-    keys = []
-    for _ in range(count):
-        # Generate a random 8-char key (e.g. A1B2-C3D4 style or simple alphanumeric)
-        key_str = str(uuid.uuid4()).split('-')[0].upper()
-        
-        # Ensure uniqueness
-        while crud.get_download_key(db, key_str):
-            key_str = str(uuid.uuid4()).split('-')[0].upper()
-            
-        crud.create_download_key(db, key_str)
-        keys.append(key_str)
-    
-    return {"generated_keys": keys}
-
-@router.get("/keys/list")
-async def list_keys(admin_secret: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    if admin_secret != "TraeAdmin2026":
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    
-    keys = db.query(models.DownloadKey).offset(skip).limit(limit).all()
-    return keys

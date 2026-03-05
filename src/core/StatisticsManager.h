@@ -25,7 +25,7 @@ private:
     QString calculateHash(const QString& input);
     
     QNetworkAccessManager *m_networkManager;
-    const QString REPORT_URL = "http://47.101.52.0/api/report";
+    const QString REPORT_URL = "http://47.101.52.0/api/analytics/usage";
     const QString SALT = "DeskCare_Salt_2026";
 
     QDate m_lastReportDate;

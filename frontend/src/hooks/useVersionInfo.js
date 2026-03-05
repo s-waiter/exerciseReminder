@@ -4,25 +4,33 @@ export const useVersionInfo = () => {
   const [version, setVersion] = useState(''); // No hardcoded fallback
   const [downloadUrl, setDownloadUrl] = useState(''); // No hardcoded fallback
   const [loading, setLoading] = useState(true);
+  const [requireCode, setRequireCode] = useState(true); // Default to true
 
   useEffect(() => {
-    // Use the correct API endpoint provided by backend
+    // 1. Fetch Version Info
     fetch('/updates/version.json')
       .then(res => res.json())
       .then(data => {
-        if (data.version && data.download_url) {
+        if (data.version) {
           setVersion(`v${data.version}`);
-          // Use the absolute URL provided by the backend directly
           setDownloadUrl(data.download_url);
         } else if (data.latest_version) {
-           // Fallback for older JSON format if any
            setVersion(`v${data.latest_version}`);
            setDownloadUrl(data.download_url);
         }
       })
-      .catch(err => console.error("Failed to fetch version info:", err))
+      .catch(err => console.error("Failed to fetch version info:", err));
+
+    // 2. Fetch Download Status
+    fetch('/api/downloads/status')
+      .then(res => res.json())
+      .then(data => {
+        setRequireCode(data.require_code);
+      })
+      .catch(err => console.error("Failed to fetch download status:", err))
       .finally(() => setLoading(false));
+
   }, []);
 
-  return { version, downloadUrl, loading };
+  return { version, downloadUrl, loading, requireCode };
 };
