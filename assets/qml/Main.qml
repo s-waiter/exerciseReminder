@@ -273,8 +273,8 @@ Window {
                 var startX = geo.x
                 var startY = geo.y
                 
-                // 悬浮球尺寸 120x120
-                var targetX = startX + availW - 120 - 50 // 右侧留出 50px 边距
+                // 悬浮球尺寸 80x80
+                var targetX = startX + availW - 80 - 50 // 右侧留出 50px 边距
                 var targetY = startY + 100 // 顶部留出 100px 边距
                 
                 mainWindow.x = targetX
@@ -321,10 +321,10 @@ Window {
     }
     
     // 动态调整窗口大小：
-    // isPinned (迷你模式): 120x120
+    // isPinned (迷你模式): 80x80
     // Normal (正常模式): 280x420 (恢复到用户觉得舒适的尺寸)
-    width: isPinned ? 120 : 280
-    height: isPinned ? 120 : 420
+    width: isPinned ? 80 : 280
+    height: isPinned ? 80 : 420
 
     // Loader for Activity Dashboard
     Loader {
@@ -527,13 +527,13 @@ Window {
         // 为了让视觉中心（倒计时圆环）看起来还在原来的位置，我们需要反向移动窗口坐标。
         // 
         // 计算依据：
-        // 1. 水平方向：Normal宽280(中心140) -> Mini宽120(中心60)。差值 80。
-        //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 80。
-        // 2. 垂直方向：Normal TopMargin 60 -> Mini TopMargin 10。
+        // 1. 水平方向：Normal宽280(中心140) -> Mini宽80(中心40)。差值 140-40=100。
+        //    切换到 Mini (变窄)，内容相对窗口左移了，为了保持视觉位置，窗口需右移 100。
+        // 2. 垂直方向：Normal TopMargin 60 -> Mini TopMargin 5。
         //    Normal CircleCenterY = 60 + 150/2 = 135
-        //    Mini CircleCenterY = 10 + 100/2 = 60
-        //    差值 135 - 60 = 75。
-        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 75。
+        //    Mini CircleCenterY = 5 + 70/2 = 40
+        //    差值 135 - 40 = 95。
+        //    切换到 Mini (上移)，内容相对窗口上移了，为了保持视觉位置，窗口需下移 95。
         
         // 注意：如果是程序启动时的初始化阶段 (isInitialized == false)，
         // 我们不执行这个位移补偿。因为此时我们正在通过代码强制设置窗口的初始位置 (例如右上角)，
@@ -541,11 +541,11 @@ Window {
         if (!isInitialized) return
         
         if (isPinned) {
-            mainWindow.x += 80
-            mainWindow.y += 75
+            mainWindow.x += 100
+            mainWindow.y += 95
         } else {
-            mainWindow.x -= 80
-            mainWindow.y -= 75
+            mainWindow.x -= 100
+            mainWindow.y -= 95
         }
         
         // 内存优化：延迟 GC
@@ -685,8 +685,8 @@ Window {
             Rectangle {
                 id: glowRect
                 // 迷你模式下居中，正常模式下保持在左上角
-                width: isPinned ? 160 : 220
-                height: isPinned ? 160 : 220
+                width: isPinned ? 110 : 220
+                height: isPinned ? 110 : 220
                 radius: width / 2
                 color: mainWindow.themeColor
                 opacity: 0.05
@@ -898,14 +898,14 @@ Window {
         // 1. 环形进度条 + 时间显示 (独立于 Column，固定位置)
         Item {
             id: circleItem
-            // 动态调整尺寸：Normal 150 -> Mini 100
-            width: isPinned ? 100 : 150
-            height: isPinned ? 100 : 150
+            // 动态调整尺寸：Normal 150 -> Mini 70
+            width: isPinned ? 70 : 150
+            height: isPinned ? 70 : 150
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            // Normal模式下下移 60px 以避开标题栏，Mini模式下仅保留 10px 边距居中
+            // Normal模式下下移 60px 以避开标题栏，Mini模式下仅保留 5px 边距居中
             // 配合 onIsPinnedChanged 中的窗口坐标补偿，实现视觉位置静止
-            anchors.topMargin: isPinned ? 10 : 60
+            anchors.topMargin: isPinned ? 5 : 60
             
             // 关键：TopMargin 必须严格同步 Window 几何动画 (OutExpo)，消除抖动
             // Width/Height 使用带轻微回弹的曲线 (OutBack)，增加活力与弹性
@@ -920,7 +920,7 @@ Window {
                 // 迷你模式下添加深色背景以增强对比度，解决文字看不清的问题
                 color: isPinned ? "#99000000" : "transparent"
                 border.color: "#33ffffff"
-                border.width: 4
+                border.width: isPinned ? 3 : 4
                 
                 Behavior on color { ColorAnimation { duration: 300 } }
             }
@@ -1011,7 +1011,7 @@ Window {
                     ctx.beginPath();
                     // arc 参数: x, y, radius, startAngle, endAngle, antiClockwise
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2 * progress, false);
-                    ctx.lineWidth = isPinned ? 6 : 6; // 迷你模式下稍微加粗一点
+                    ctx.lineWidth = isPinned ? 4.5 : 6; // 迷你模式下适配缩小后的尺寸
                     ctx.lineCap = "round"; // 圆头线帽
                     
                     if (isPinned) {
@@ -1199,7 +1199,7 @@ Window {
                             // 补零格式化: 9:5 -> 09:05
                             text: (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs)
                             color: "#ffffff"
-                            font.pixelSize: isPinned ? 28 : 34 // 迷你模式下字体稍微加大，因为去掉了下面的文字
+                            font.pixelSize: isPinned ? 20 : 34 // 迷你模式下字体稍微加大，因为去掉了下面的文字
                             font.family: "Segoe UI Light" // 细体字更有科技感
                             font.weight: Font.Light
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1210,7 +1210,7 @@ Window {
                         Text {
                             text: timerEngine.statusText
                             color: mainWindow.themeColor
-                            font.pixelSize: isPinned ? 10 : 12 // 动态字体大小
+                            font.pixelSize: isPinned ? 8 : 12 // 动态字体大小
                             font.bold: true
                             font.family: "Microsoft YaHei UI"
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1263,7 +1263,7 @@ Window {
                         Text {
                             text: timerEngine.estimatedFinishTime
                             color: "#ffffff" // 纯白高亮
-                            font.pixelSize: 24
+                            font.pixelSize: isPinned ? 18 : 24
                             font.family: "Segoe UI"
                             font.styleName: "Semibold" // 确保数字清晰有力
                             font.weight: Font.DemiBold
@@ -1274,7 +1274,7 @@ Window {
                         Text {
                             text: "预计运动"
                             color: mainWindow.themeColor // 跟随动态主题色
-                            font.pixelSize: 10
+                            font.pixelSize: isPinned ? 9 : 10
                             font.family: "Microsoft YaHei UI" // 强制使用微软雅黑，拒绝宋体
                             font.bold: true
                             font.letterSpacing: 2 // 增加字间距，提升精致感
