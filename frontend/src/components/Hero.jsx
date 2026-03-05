@@ -53,7 +53,7 @@ const Hero = ({ trackDownload }) => {
           >
             <span className="block mb-2">不仅是久坐提醒</span>
             <span className="bg-gradient-to-r from-teal-200 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-              更是您的全能健康管家
+              更是您的全能管家
             </span>
           </motion.h1>
           
