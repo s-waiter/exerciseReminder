@@ -3,7 +3,8 @@ import os
 import sys
 
 # Paths
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Script is now in deployment/scripts/, so go up 3 levels to find project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VERSION_JSON_PATH = os.path.join(PROJECT_ROOT, "version_info.json")
 VERSION_HEADER_PATH = os.path.join(PROJECT_ROOT, "src", "core", "Version.h")
 

@@ -6,11 +6,11 @@ cd /d "%~dp0"
 
 :: 0. Version Management
 echo [VERSION] Checking version...
-"D:\jinzhan\Software\code\anaconda3\python.exe" ..\scripts\manage_version.py
+"D:\jinzhan\Software\code\anaconda3\python.exe" scripts\manage_version.py
 echo.
 set /p DO_BUMP="Do you want to bump the version? (Y/N): "
 if /i "%DO_BUMP%"=="Y" (
-    "D:\jinzhan\Software\code\anaconda3\python.exe" ..\scripts\manage_version.py bump
+    "D:\jinzhan\Software\code\anaconda3\python.exe" scripts\manage_version.py bump
     if !ERRORLEVEL! NEQ 0 (
         echo [ERROR] Version bump failed.
         pause
@@ -139,19 +139,8 @@ del "%DIST_DIR%\*.h" >nul 2>nul
 
 :: 8. Package Zip
 echo [PACK] Creating Zip...
-:: Run package_zip.py from scripts folder (one level down from project root)
-:: We are in project root here because of pushd .. above? No, wait.
-:: Let's check context.
-:: deployment/one_click_package.bat is called.
-:: cd /d "%~dp0" -> enters deployment/
-:: ..\ -> project root
-
-:: Correct logic:
-:: We need to call scripts/package_zip.py from project root context or just call it directly.
-:: Since package_zip.py now calculates PROJECT_ROOT correctly based on its own location,
-:: we can just call it.
-
-"D:\jinzhan\Software\code\anaconda3\python.exe" ..\scripts\package_zip.py
+:: Run package_zip.py from scripts folder (subdirectory of current deployment folder)
+"D:\jinzhan\Software\code\anaconda3\python.exe" scripts\package_zip.py
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Packaging failed.
     pause

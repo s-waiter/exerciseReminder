@@ -6,8 +6,8 @@ import json
 
 # Read version from version_info.json
 def get_version():
-    # If script is in scripts/ folder, version_info.json is in parent
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # If script is in deployment/scripts/, version_info.json is in project root (3 levels up)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     json_path = os.path.join(project_root, "version_info.json")
     if os.path.exists(json_path):
         with open(json_path, 'r') as f:
@@ -15,7 +15,7 @@ def get_version():
             return f"{v['major']}.{v['minor']}.{v['patch']}"
     return "1.0.0"
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DIST_DIR = os.path.join(PROJECT_ROOT, "dist")
 RELEASES_DIR = os.path.join(PROJECT_ROOT, "releases")
 VERSION = get_version()
