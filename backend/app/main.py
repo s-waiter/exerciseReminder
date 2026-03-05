@@ -9,51 +9,42 @@ import os
 # Database Migration Helper
 def run_migrations():
     # Simple migration to add columns if they don't exist
-    # This is a workaround for SQLite not supporting 'IF NOT EXISTS' in ADD COLUMN well via simple SQL in older versions, 
-    # but we can try-catch.
     db = SessionLocal()
     try:
-        # Check if 'referrer' column exists in 'website_visits'
-        # SQLite pragma table_info
-        result = db.execute(text("PRAGMA table_info(website_visits)")).fetchall()
-        columns = [row[1] for row in result]
-        
-        if "referrer" not in columns:
-            print("Migrating: Adding referrer column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN referrer VARCHAR"))
-        
-        if "os" not in columns:
-            print("Migrating: Adding os column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN os VARCHAR"))
+        # MySQL migration check
+        result = db.execute(text("SHOW COLUMNS FROM website_visits")).fetchall()
+        columns = [row[0] for row in result]
             
-        if "browser" not in columns:
-            print("Migrating: Adding browser column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN browser VARCHAR"))
-            
-        if "device_type" not in columns:
-            print("Migrating: Adding device_type column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN device_type VARCHAR"))
-            
-        if "duration_seconds" not in columns:
-            print("Migrating: Adding duration_seconds column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN duration_seconds INTEGER DEFAULT 0"))
+        # Helper to add column safely
+        def add_column_safe(col_name, col_type):
+            if col_name not in columns:
+                print(f"Migrating: Adding {col_name} column...")
+                try:
+                    db.execute(text(f"ALTER TABLE website_visits ADD COLUMN {col_name} {col_type}"))
+                    db.commit()
+                except Exception as ex:
+                    print(f"Error adding {col_name}: {ex}")
+                    db.rollback()
 
-        if "is_downloaded" not in columns:
-            print("Migrating: Adding is_downloaded column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN is_downloaded BOOLEAN DEFAULT 0"))
-
-        if "downloaded_version" not in columns:
-            print("Migrating: Adding downloaded_version column...")
-            db.execute(text("ALTER TABLE website_visits ADD COLUMN downloaded_version VARCHAR"))
+        if columns: # Only run if table exists
+            add_column_safe("referrer", "VARCHAR(255)")
+            add_column_safe("os", "VARCHAR(255)")
+            add_column_safe("browser", "VARCHAR(255)")
+            add_column_safe("device_type", "VARCHAR(255)")
+            add_column_safe("duration_seconds", "INTEGER DEFAULT 0")
+            add_column_safe("is_downloaded", "BOOLEAN DEFAULT 0")
+            add_column_safe("downloaded_version", "VARCHAR(255)")
             
-        db.commit()
     except Exception as e:
         print(f"Migration warning: {e}")
+        # If table doesn't exist, create_all will handle it later, so this exception is fine for first run
     finally:
         db.close()
 
-run_migrations()
+# Ensure tables exist
 Base.metadata.create_all(bind=engine)
+# Run migrations for existing tables
+run_migrations()
 
 app = FastAPI(
     title="DeskCare Backend API",

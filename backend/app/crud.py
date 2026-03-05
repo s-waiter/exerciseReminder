@@ -73,12 +73,14 @@ def get_stats_overview(db: Session):
     today = date.today()
     today_pv = db.query(models.WebsiteVisit).filter(func.date(models.WebsiteVisit.visited_at) == today).count()
     today_uv = db.query(models.WebsiteVisit.ip_address).filter(func.date(models.WebsiteVisit.visited_at) == today).distinct().count()
+    today_dau = db.query(models.DailyUsage).filter(models.DailyUsage.date == today).count()
     total_downloads = db.query(models.DownloadLog).count()
     total_users = db.query(models.DailyUsage.uid).distinct().count()
     return {
         "total_pv": total_pv,
         "today_pv": today_pv,
         "today_uv": today_uv,
+        "today_dau": today_dau,
         "total_downloads": total_downloads,
         "total_users": total_users
     }
@@ -94,6 +96,20 @@ def get_visit_trend(db: Session, days: int = 30):
      .order_by("date")\
      .all()
     return results
+
+def get_dau_trend(db: Session, days: int = 30):
+    start_date = date.today() - timedelta(days=days)
+    results = db.query(
+        models.DailyUsage.date,
+        func.count(models.DailyUsage.id).label("active_users")
+    ).filter(models.DailyUsage.date >= start_date)\
+     .group_by(models.DailyUsage.date)\
+     .order_by(models.DailyUsage.date)\
+     .all()
+    return results
+
+def get_daily_usage_logs(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.DailyUsage).order_by(models.DailyUsage.last_seen.desc()).offset(skip).limit(limit).all()
 
 def get_geo_distribution(db: Session, limit: int = 10):
     return db.query(

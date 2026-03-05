@@ -11,41 +11,92 @@
 
 StatisticsManager::StatisticsManager(QObject *parent) : QObject(parent) {
     m_networkManager = new QNetworkAccessManager(this);
+    
+    // 初始化重试定时器
+    m_retryTimer = new QTimer(this);
+    m_retryTimer->setSingleShot(true);
+    connect(m_retryTimer, &QTimer::timeout, this, &StatisticsManager::reportUsage);
+
+    // 初始化每日检查定时器 (每小时检查一次)
+    m_dailyCheckTimer = new QTimer(this);
+    m_dailyCheckTimer->setInterval(60 * 60 * 1000); 
+    connect(m_dailyCheckTimer, &QTimer::timeout, this, &StatisticsManager::checkNewDay);
+    m_dailyCheckTimer->start();
 }
 
 void StatisticsManager::reportStartup() {
     // 延时上报，避免影响启动速度
-    QTimer::singleShot(2000, this, [this]() {
-        QString uid = getMachineId();
-        QString version = Version::getCurrentVersion();
-        
-        // 构造 URL 参数
-        QUrl url(REPORT_URL);
-        QUrlQuery query;
-        query.addQueryItem("uid", uid);
-        query.addQueryItem("ver", version);
-        query.addQueryItem("app", "DeskCare");
-        url.setQuery(query);
+    QTimer::singleShot(2000, this, &StatisticsManager::reportUsage);
+}
 
-        QNetworkRequest request(url);
-        // 设置 User-Agent 方便日志识别
-        request.setHeader(QNetworkRequest::UserAgentHeader, "DeskCare-Client/1.0");
+void StatisticsManager::checkNewDay() {
+    if (m_lastReportDate != QDate::currentDate()) {
+        qDebug() << "New day detected. Reporting usage...";
+        // 重置重试计数器，确保新的一天能重新尝试
+        m_retryCount = 0; 
+        reportUsage();
+    }
+}
 
-        qDebug() << "Reporting stats to:" << url.toString();
+void StatisticsManager::reportUsage() {
+    // 如果今天已经成功上报过，且不是重试机制触发的(通常重试不会改变日期，除非跨天了)，则跳过
+    // 但为了保险起见，如果当前日期 > 上次上报日期，我们就报
+    if (m_lastReportDate == QDate::currentDate()) {
+        // 今天已经报过了
+        return;
+    }
 
-        // 发送 GET 请求 (日志统计模式)
-        QNetworkReply *reply = m_networkManager->get(request);
-        
-        connect(reply, &QNetworkReply::finished, this, [reply]() {
-            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            if (reply->error() == QNetworkReply::NoError) {
-                qDebug() << "Stats reported successfully. Status:" << statusCode;
-            } else {
-                qWarning() << "Stats report failed:" << reply->errorString() << "Status:" << statusCode;
-            }
-            reply->deleteLater();
-        });
+    QString uid = getMachineId();
+    QString version = Version::getCurrentVersion();
+    
+    // 构造 URL 参数
+    QUrl url(REPORT_URL);
+    QUrlQuery query;
+    query.addQueryItem("uid", uid);
+    query.addQueryItem("ver", version);
+    query.addQueryItem("app", "DeskCare");
+    url.setQuery(query);
+
+    QNetworkRequest request(url);
+    // 设置 User-Agent 方便日志识别
+    request.setHeader(QNetworkRequest::UserAgentHeader, "DeskCare-Client/1.0");
+
+    qDebug() << "Reporting stats to:" << url.toString();
+
+    // 发送 GET 请求
+    QNetworkReply *reply = m_networkManager->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        onReportFinished(reply);
+        reply->deleteLater();
     });
+}
+
+void StatisticsManager::onReportFinished(QNetworkReply* reply) {
+    if (!reply) return;
+
+    int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (reply->error() == QNetworkReply::NoError && (statusCode == 200 || statusCode == 0)) {
+        qDebug() << "Stats reported successfully. Status:" << statusCode;
+        m_lastReportDate = QDate::currentDate();
+        m_retryCount = 0; // 重置重试次数
+    } else {
+        qWarning() << "Stats report failed:" << reply->errorString() << "Status:" << statusCode;
+        retryReport();
+    }
+}
+
+void StatisticsManager::retryReport() {
+    if (m_retryCount < MAX_RETRIES) {
+        m_retryCount++;
+        // 指数退避策略: 10s, 30s, 60s, 2m, 5m...
+        int delay = 10000 * m_retryCount; 
+        if (delay > 300000) delay = 300000; // 最大间隔 5分钟
+
+        qDebug() << "Will retry reporting in" << delay << "ms (Attempt" << m_retryCount << ")";
+        m_retryTimer->start(delay);
+    } else {
+        qWarning() << "Max retries reached for stats reporting. Giving up for now.";
+    }
 }
 
 QString StatisticsManager::getMachineId() {

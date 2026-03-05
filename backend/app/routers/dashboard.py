@@ -30,12 +30,17 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
     # 1. 基础数据
     overview = crud.get_stats_overview(db)
     
-    # 2. 趋势数据 (PV/UV) - 30天
+    # 2. 官网趋势数据 (PV/UV) - 30天
     trend_data = crud.get_visit_trend(db, 30)
-    trend_dates = [t.date for t in trend_data]
+    trend_dates = [str(t.date) for t in trend_data]
     trend_pv = [t.pv for t in trend_data]
     trend_uv = [t.uv for t in trend_data]
     
+    # 2.1 软件活跃趋势 (DAU) - 30天
+    dau_data = crud.get_dau_trend(db, 30)
+    dau_dates = [str(t.date) for t in dau_data]
+    dau_counts = [t.active_users for t in dau_data]
+
     # 3. 分布数据
     geo_data = crud.get_geo_distribution(db, 10)
     geo_chart_data = [{"name": g.geo_location, "value": g.count} for g in geo_data]
@@ -49,6 +54,9 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
     # 4. 最近访问日志
     recent_visits = crud.get_website_visits(db, 0, 50) # Increased to 50
     
+    # 5. 最近软件使用日志 (DAU Details)
+    recent_usage = crud.get_daily_usage_logs(db, 0, 50)
+
     html = f"""
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -88,13 +96,17 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
             </div>
             
             <!-- 概览卡片 -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-10">
+                <div class="card border-l-4 border-rose-500">
+                    <div class="stat-label">今日软件日活 (DAU)</div>
+                    <div class="stat-value text-rose-600">{overview['today_dau']}</div>
+                </div>
                 <div class="card border-l-4 border-blue-500">
-                    <div class="stat-label">今日浏览量 (PV)</div>
+                    <div class="stat-label">今日官网浏览 (PV)</div>
                     <div class="stat-value text-blue-600">{overview['today_pv']}</div>
                 </div>
                 <div class="card border-l-4 border-emerald-500">
-                    <div class="stat-label">今日访客数 (UV)</div>
+                    <div class="stat-label">今日官网访客 (UV)</div>
                     <div class="stat-value text-emerald-600">{overview['today_uv']}</div>
                 </div>
                 <div class="card border-l-4 border-violet-500">
@@ -111,13 +123,22 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
                 </div>
             </div>
             
-            <!-- 趋势图 -->
+            <!-- 软件活跃趋势图 -->
             <div class="card mb-10">
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl font-bold text-slate-800">近30天访问趋势</h2>
-                    <span class="text-sm text-slate-400">PV / UV</span>
+                    <h2 class="text-xl font-bold text-slate-800">软件活跃趋势 (DAU - 近30天)</h2>
+                    <span class="text-sm text-slate-400">Active Users</span>
                 </div>
-                <div id="trendChart" class="chart-container" style="height: 450px;"></div>
+                <div id="dauChart" class="chart-container" style="height: 350px;"></div>
+            </div>
+
+            <!-- 官网趋势图 -->
+            <div class="card mb-10">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-slate-800">官网访问趋势 (PV / UV)</h2>
+                    <span class="text-sm text-slate-400">Website Traffic</span>
+                </div>
+                <div id="trendChart" class="chart-container" style="height: 350px;"></div>
             </div>
             
             <!-- 分布图 -->
@@ -136,6 +157,51 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
                 </div>
             </div>
             
+            <!-- 详细软件使用日志 (DAU Details) -->
+            <div class="card overflow-hidden mb-10">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-slate-800">软件实时活跃记录 (DAU - 最近50条)</h2>
+                </div>
+                <div class="overflow-x-auto -mx-6">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50/50">
+                            <tr>
+                                <th class="px-6 py-4 text-left">最近活跃时间</th>
+                                <th class="px-6 py-4 text-left">IP / 地理位置</th>
+                                <th class="px-6 py-4 text-left">版本号</th>
+                                <th class="px-6 py-4 text-left">机器码 (UID)</th>
+                                <th class="px-6 py-4 text-left">今日启动次数</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {"".join([f'''
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                                    {u.last_seen.strftime('%Y-%m-%d')}<br>
+                                    <span class="text-xs text-gray-400">{u.last_seen.strftime('%H:%M:%S')}</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <div class="font-medium text-slate-700">{u.ip_address}</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">{u.geo_location or "Unknown"}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                        v{u.version}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
+                                    {u.uid}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span class="font-semibold text-slate-700">{u.launch_count}</span> 次
+                                </td>
+                            </tr>
+                            ''' for u in recent_usage])}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- 详细日志表格 -->
             <div class="card overflow-hidden">
                 <div class="flex items-center justify-between mb-6">
@@ -272,6 +338,49 @@ async def dashboard(secret: str, db: Session = Depends(get_db)):
                 ]
             }};
             trendChart.setOption(trendOption);
+
+            // DAU Chart
+            var dauChart = echarts.init(document.getElementById('dauChart'));
+            var dauOption = {{
+                tooltip: commonTooltip,
+                legend: {{ 
+                    data: ['活跃用户 (DAU)'],
+                    bottom: 0
+                }},
+                grid: {{ ...commonGrid, bottom: '10%' }},
+                xAxis: {{ 
+                    type: 'category', 
+                    boundaryGap: false, 
+                    data: {json.dumps(dau_dates)},
+                    axisLine: {{ lineStyle: {{ color: '#cbd5e1' }} }},
+                    axisLabel: {{ color: '#64748b' }}
+                }},
+                yAxis: {{ 
+                    type: 'value',
+                    splitLine: {{ lineStyle: {{ color: '#f1f5f9' }} }},
+                    axisLabel: {{ color: '#64748b' }}
+                }},
+                series: [
+                    {{ 
+                        name: '活跃用户 (DAU)', 
+                        type: 'line', 
+                        data: {json.dumps(dau_counts)}, 
+                        smooth: true, 
+                        showSymbol: true,
+                        symbol: 'circle',
+                        symbolSize: 8,
+                        color: '#f43f5e', 
+                        lineStyle: {{ width: 3 }},
+                        areaStyle: {{
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {{ offset: 0, color: 'rgba(244, 63, 94, 0.2)' }},
+                                {{ offset: 1, color: 'rgba(244, 63, 94, 0.0)' }}
+                            ])
+                        }}
+                    }}
+                ]
+            }};
+            dauChart.setOption(dauOption);
 
             // 饼图通用配置
             const pieTooltip = {{

@@ -8,3 +8,5 @@ aiofiles
 jinja2
 paramiko
 user-agents
+pymysql
+cryptography

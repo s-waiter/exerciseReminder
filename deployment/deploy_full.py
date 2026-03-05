@@ -299,10 +299,107 @@ def deploy_app_package(client, sftp):
         
     print("Application package deployment complete.")
 
+def run_mysql(client, sql, password="pass"):
+    """Helper to run SQL command with or without password"""
+    # Try with password first (most likely case for re-runs)
+    cmd_with_pass = f'mysql -u root -p"{password}" -e "{sql}"'
+    print(f"Executing SQL (with password): {sql}")
+    out = run_remote(client, cmd_with_pass, ignore_errors=True)
+    
+    # Check if successful (empty output or standard output is fine, but error usually goes to stderr which run_remote prints)
+    # However, run_remote with ignore_errors=True returns stdout.
+    # We can't easily check exit code with current run_remote implementation without modifying it.
+    # Let's modify run_remote to return (exit_code, stdout, stderr) or just check the output for "Access denied"
+    
+    # Actually, let's just try without password if the first one failed?
+    # But run_remote doesn't tell us if it failed.
+    # Let's assume we can chain them: try password OR try no password.
+    
+    # Better approach:
+    # 1. Create a temporary .my.cnf with the password
+    # 2. Run command
+    # 3. If that fails, run without .my.cnf
+    pass
+
+def setup_mysql(client):
+    print("--- Setting up MySQL ---")
+    
+    # 1. Install MySQL Server
+    print("Installing MySQL Server...")
+    run_remote(client, "apt-get update", True)
+    run_remote(client, "DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server net-tools", True)
+    
+    # 2. Configure root password and access
+    print("Configuring Database...")
+    
+    # Define SQL commands
+    sql_commands = [
+        # Set root password for localhost
+        "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'pass';",
+        # Create Database
+        "CREATE DATABASE IF NOT EXISTS deskcare CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;",
+        # Create remote root user - FIX: Drop first to ensure clean recreation if password/host changed
+        "DROP USER IF EXISTS 'root'@'%';",
+        "CREATE USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'pass';",
+        "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;",
+        "FLUSH PRIVILEGES;"
+    ]
+    
+    # Strategy: 
+    # Since we don't know the current state (fresh install vs existing password),
+    # we'll try to execute each command using BOTH authentication methods.
+    # This is a bit brute-force but robust for this script.
+    
+    for sql in sql_commands:
+        # Escape double quotes in SQL for the shell command
+        safe_sql = sql.replace('"', '\\"')
+        
+        # Method A: Try with password
+        cmd_a = f'mysql -u root -ppass -e "{safe_sql}"'
+        # Method B: Try without password (sudo mysql default)
+        cmd_b = f'mysql -e "{safe_sql}"'
+        
+        print(f"Executing: {sql}")
+        # We run both. One should succeed, the other might fail.
+        # We silence errors to avoid confusing the user, as one failure is expected.
+        run_remote(client, f"{cmd_a} || {cmd_b}", ignore_errors=True)
+        
+    # 3. Allow remote access (bind-address)
+    print("Configuring remote access...")
+    # Change bind-address by adding a new config file (more reliable than sed)
+    remote_conf = "[mysqld]\nbind-address = 0.0.0.0\n"
+    # Write to a location that overrides default
+    run_remote(client, f"echo '{remote_conf}' > /etc/mysql/mysql.conf.d/99-remote.cnf", True)
+    
+    # 4. Configure Firewall (UFW)
+    print("Configuring Firewall (UFW)...")
+    run_remote(client, "ufw allow 3306/tcp", True)
+    run_remote(client, "ufw reload", True)
+
+    # 5. Restart MySQL
+    print("Restarting MySQL...")
+    run_remote(client, "systemctl restart mysql")
+    
+    # 6. Verify Port Listening
+    print("Verifying MySQL is listening on 0.0.0.0:3306...")
+    status = run_remote(client, "netstat -tuln | grep 3306", True)
+    print(f"Server Port Status: {status}")
+    
+    if "0.0.0.0:3306" in status or ":::3306" in status:
+        print("✅ MySQL is correctly listening on all interfaces.")
+    else:
+        print("❌ MySQL might not be listening correctly. Please check server logs.")
+
+    print("\n" + "="*60)
+    print("MySQL Setup Complete!")
+    print("IMPORTANT: If you still cannot connect, please check your Cloud Provider's Security Group (Firewall).")
+    print("Ensure that TCP port 3306 is open for Inbound traffic.")
+    print("="*60 + "\n")
+
 def main():
     parser = argparse.ArgumentParser(description="DeskCare Automated Deployment Tool")
-    parser.add_argument("mode", choices=["all", "backend", "frontend", "app"], 
-                        help="Deployment mode: all (full stack), backend (python api), frontend (website), app (installer zip)")
+    parser.add_argument("mode", choices=["all", "backend", "frontend", "app", "setup_mysql"], 
+                        help="Deployment mode: all, backend, frontend, app, or setup_mysql (install db)")
     
     args = parser.parse_args()
     
@@ -315,6 +412,11 @@ def main():
         print(f"Connection failed: {e}")
         sys.exit(1)
 
+    if args.mode == "setup_mysql":
+        setup_mysql(client)
+        # Also deploy backend to update config
+        deploy_backend_only(client, sftp)
+
     if args.mode == "frontend" or args.mode == "all":
         deploy_frontend_only(client, sftp)
         
@@ -324,6 +426,7 @@ def main():
     if args.mode == "app" or args.mode == "all":
         deploy_app_package(client, sftp)
 
+    sftp.close()
     client.close()
     print("All tasks finished.")
 
