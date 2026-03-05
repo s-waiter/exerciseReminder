@@ -38,9 +38,14 @@ def main():
     # Base paths
     # Assuming this script is run from the project root or we find it relative to this script
     # But for simplicity, let's assume it's run from project root as per bat script
-    project_root = os.getcwd()
-    dist_dir = os.path.join(project_root, "dist")
-    releases_dir = os.path.join(project_root, "releases")
+    
+    # Use global PROJECT_ROOT to ensure we target the correct releases folder
+    # matching deploy_full.py expectation
+    releases_dir = RELEASES_DIR
+    
+    # However, dist is created in CWD by the bat script, so keep that relative
+    current_cwd = os.getcwd()
+    dist_dir = os.path.join(current_cwd, "dist")
     
     # Ensure releases directory exists
     if not os.path.exists(releases_dir):
