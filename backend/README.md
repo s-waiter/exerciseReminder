@@ -1,125 +1,175 @@
-# DeskCare Python 后端系统说明文档
+# DeskCare 服务端项目文档
 
-## 1. 系统简介
+## 1. 项目简介
 
-DeskCare 后端系统是一个基于 Python FastAPI 框架构建的高性能、轻量级服务端应用。它主要负责为 DeskCare 客户端提供API支持，同时也承载了软件官网的静态资源服务。
+DeskCare 服务端项目集成了 Python FastAPI 后端服务与 React 前端官网，旨在提供一站式的后端支持、数据统计及官网展示功能。
 
-核心目标是提供稳定、快速的接口服务，并实现精细化的数据统计与用户行为分析。
+*   **项目根目录**: `DeskCare/`
+*   **前端部分**: `frontend/` (React + Vite)
+*   **后端部分**: `backend/` (FastAPI + SQLite)
 
-## 2. 详细功能介绍
+## 2. 目录结构
 
-### 2.1 实时数据分析看板 (Admin Dashboard)
-访问地址：`/admin/dashboard?secret=TraeAdmin2026` (默认密钥，请在生产环境中修改)
-
-这是一个全中文的可视化数据监控后台，集成了 ECharts 图表库，提供以下核心指标：
-*   **实时概览**：展示今日浏览量(PV)、今日访客数(UV)、历史总浏览量、总下载量及总用户数(机器ID去重)。
-*   **流量趋势分析**：最近7天的 PV/UV 折线图，帮助观察流量波动。
-*   **用户画像分布**：
-    *   **地理位置分布**：基于 GeoIP2 库解析 IP，展示用户来源地 Top 10。
-    *   **操作系统分布**：识别 Windows, macOS, Linux, iOS, Android 等。
-    *   **浏览器分布**：识别 Chrome, Firefox, Safari, Edge 等。
-*   **实时访问日志**：最近20条详细访问记录，包括时间、IP、设备类型(PC/Mobile)、来源(Referrer)及访问路径。
-
-### 2.2 软件下载与版本控制
-*   **下载凭证管理**：支持生成一次性或多次使用的下载密钥 (Download Key)，防止软件被滥用下载。
-*   **自动版本检测**：客户端启动时自动请求 `/updates/version.json`，后端返回最新版本号及更新日志，支持强制更新。
-*   **安装包分发**：直接通过后端分发 `DeskCare_Setup.exe`，支持断点续传。
-
-### 2.3 用户行为统计 (Analytics)
-*   **启动活跃度 (DAU)**：通过唯一的机器码 (Machine ID) 统计每日活跃用户，不依赖 Cookie，更精准。
-*   **安装来源追踪**：记录用户是从哪个推广链接或搜索引擎进入官网并下载的。
-
-### 2.4 云端配置备份
-*   **配置上传**：用户可将本地 DeskCare 配置一键上传至云端数据库。
-*   **配置恢复**：在任何新设备上输入账号/密钥即可恢复之前的习惯设置。
-
-## 3. 技术架构方案
-
-### 3.1 技术栈
-*   **Web 框架**: FastAPI (高性能异步框架)
-*   **服务器**: Uvicorn (ASGI 服务器)
-*   **数据库**: SQLite (轻量级，无需额外配置，适合中小型应用) + SQLAlchemy (ORM)
-*   **IP 地理库**: GeoIP2 (MaxMind GeoLite2 数据库)
-*   **前端技术**: Tailwind CSS (原子化 CSS) + ECharts 5 (数据可视化)
-*   **部署工具**: Paramiko (Python SSH 库，用于自动化部署)
-
-### 3.2 目录结构
 ```
-backend_python/
-├── app/
-│   ├── core/           # 核心组件 (GeoIP 数据库)
-│   ├── routers/        # API 路由 (analytics, dashboard, downloads, etc.)
-│   ├── crud.py         # 数据库 CRUD 操作
-│   ├── database.py     # 数据库连接配置
-│   ├── main.py         # FastAPI 入口
-│   ├── models.py       # SQLAlchemy 数据模型
-│   └── schemas.py      # Pydantic 数据验证模型
-├── files/              # 存放安装包 (DeskCare_Setup.exe) 和版本信息 (version_info.json)
-├── static/             # 存放官网静态资源 (index.html, css, js)
-├── deploy_remote.py    # 自动化部署脚本
-├── requirements.txt    # Python 依赖列表
-└── run.py              # 本地开发启动脚本
+DeskCare/
+├── frontend/           # 官网前端项目 (React + Vite)
+│   ├── src/            # 前端源码
+│   ├── public/         # 静态资源
+│   ├── package.json    # 前端依赖
+│   └── vite.config.js  # 构建配置
+├── backend/            # Python 后端服务 (FastAPI)
+│   ├── app/            # 应用核心代码
+│   ├── files/          # 存放安装包和版本信息
+│   ├── static/         # 存放前端构建产物 (自动生成)
+│   ├── requirements.txt# 后端依赖
+│   └── run.py          # 本地启动脚本
+├── releases/           # [新增] 存放打包好的安装包 (DeskCare_vX.X.X.zip)
+├── deploy_full.py      # 【核心】全自动化部署脚本
+├── deploy_backend.bat  # [快捷] 仅部署后端
+├── deploy_frontend.bat # [快捷] 仅部署官网
+├── one_click_package.bat # [快捷] 一键构建+打包+发布
+├── version_info.json   # 全局版本控制文件
+└── ...
 ```
 
-### 3.3 数据库设计
-系统主要包含以下数据表：
-*   `website_visits`: 记录所有 HTTP 请求日志 (IP, UA, Referrer, Geo, Device Type)。
-*   `download_logs`: 记录软件下载行为 (Download Key 使用情况)。
-*   `daily_usage`: 记录客户端启动活跃日志 (Machine ID, Version)。
-*   `user_backups`: 存储用户的云端配置 JSON 数据。
+## 3. 详细功能与 API 接口说明
 
-## 4. 自动化部署指南
+### 3.1 官网访问统计 (Analytics)
+后端会自动记录官网的访问日志，用于生成数据看板。
 
-本项目包含一个全自动化的部署脚本 `deploy_remote.py`，能够一键将本地代码、静态资源和安装包同步到远程 Linux 服务器。
+*   **接口地址**: `GET /analytics/visit`
+*   **功能**: 记录一次页面访问 (PV)。
+*   **参数**: 无 (自动从 HTTP Header 获取 IP, User-Agent, Referer)。
+*   **后台逻辑**:
+    *   解析 User-Agent 获取操作系统 (OS)、浏览器、设备类型 (PC/Mobile)。
+    *   通过 IP 地址解析地理位置 (GeoIP)。
+    *   记录来源 (Referrer) 以分析流量入口。
+*   **前端调用**: 官网首页加载时自动调用此接口。
 
-### 4.1 部署前准备
-1.  **服务器准备**：一台安装了 Ubuntu/Debian 的 Linux 服务器。
-2.  **配置修改**：打开 `deploy_remote.py`，修改以下配置：
+### 3.2 客户端活跃度上报 (DAU)
+用于统计 DeskCare 软件的日活跃用户数。
+
+*   **接口地址**: `GET /analytics/report` (兼容旧版 `/api/report`)
+*   **参数**:
+    *   `uid`: 机器唯一标识码 (Machine ID)。
+    *   `ver`: 当前软件版本号。
+*   **功能**: 记录每日首次启动，生成 DAU 报表。
+
+### 3.3 软件下载与鉴权
+控制软件安装包的下载，支持生成下载秘钥。
+
+*   **下载接口**: `GET /download/{key}`
+    *   **功能**: 验证秘钥有效性，记录下载日志，返回安装包文件。
+    *   **参数**: `key` (下载秘钥)。
+*   **生成秘钥 (Admin)**: `POST /download/generate_key`
+    *   **参数**: `admin_secret` (管理密钥), `count` (生成数量)。
+
+### 3.4 软件自动更新
+客户端启动时检查是否有新版本。
+
+*   **接口地址**: `GET /updates/version.json`
+*   **功能**: 返回最新版本信息。
+*   **返回格式**:
+    ```json
+    {
+        "version": "1.0.7",
+        "changelog": "更新日志内容...",
+        "download_url": "http://server/files/DeskCare_v1.0.7.zip"
+    }
+    ```
+
+### 3.5 云端配置备份
+允许用户上传和恢复软件配置。
+
+*   **上传**: `POST /backup/upload`
+*   **恢复**: `GET /backup/restore?uid={uid}`
+
+### 3.6 数据监控看板 (Dashboard)
+全中文的可视化后台，无需额外账号，通过 Secret 访问。
+
+*   **访问地址**: `/admin/dashboard?secret=TraeAdmin2026`
+*   **功能**:
+    *   实时 PV/UV 统计。
+    *   近7天流量趋势图。
+    *   用户地理分布、设备分布饼图。
+    *   实时详细访问日志表格。
+
+## 4. 自动化部署与运维
+
+本项目已实现工业级的自动化部署流程，无需手动上传文件或执行命令。
+
+### 4.1 部署准备
+1.  **服务器**: 准备一台 Ubuntu/Debian 服务器。
+2.  **配置**: 修改 `deploy_full.py` 中的服务器信息：
     ```python
-    HOST = "47.101.52.0"  # 服务器 IP
-    USER = "root"         # SSH 用户名
-    PASS = "YourPassword" # SSH 密码
+    HOST = "47.101.52.0"
+    USER = "root"
+    PASS = "YourPassword"
     ```
-3.  **本地依赖**：确保本地已安装 `paramiko` 库 (`pip install paramiko`)。
+3.  **本地环境**:
+    *   Python 3.8+ (安装 `paramiko`: `pip install paramiko`)
+    *   Node.js & npm (用于构建前端)
 
-### 4.2 自动化部署流程
-运行脚本：
+### 4.2 常用部署操作 (推荐)
+
+*   **修改了 Python 后端代码？**
+    *   双击运行 `deploy_backend.bat`。
+    *   脚本会自动上传代码并重启远程服务。
+
+*   **修改了官网文案或样式？**
+    *   双击运行 `deploy_frontend.bat`。
+    *   脚本会自动编译 React 项目并发布到服务器。
+
+*   **发布新版本 DeskCare 软件？**
+    *   双击运行 `one_click_package.bat`。
+    *   脚本会自动完成以下全流程：
+        1.  版本号自增 (可选)
+        2.  调用 Qt 编译器构建 C++ 项目
+        3.  打包生成 ZIP 文件到 `releases/` 目录
+        4.  自动上传最新安装包到服务器
+        5.  同步更新服务器上的版本信息 (`version_info.json`)
+
+### 4.3 高级部署命令
+如果需要更细粒度的控制，可以在命令行运行 `deploy_full.py`：
+
 ```bash
-python deploy_remote.py
+# 全量部署 (前端+后端+安装包)
+python deploy_full.py all
+
+# 仅部署后端
+python deploy_full.py backend
+
+# 仅部署前端
+python deploy_full.py frontend
+
+# 仅发布安装包 (需 releases/ 目录下有 zip 包)
+python deploy_full.py app
 ```
 
-脚本将自动执行以下步骤：
-1.  **环境清理**：停止旧服务，清理 `/opt/deskcare` 目录。
-2.  **文件同步**：
-    *   **后端代码**：将 `app/` 目录上传到服务器。
-    *   **官网部署**：将 `static/` 目录下的 HTML/CSS/JS 文件上传到 `/opt/deskcare/static/`。
-    *   **安装包发布**：将 `files/DeskCare_Setup.exe` 上传到 `/opt/deskcare/files/`。
-3.  **依赖安装**：在服务器上创建 Python 虚拟环境 (venv)，并安装 `requirements.txt` 中的所有依赖。
-4.  **服务注册**：自动创建并配置 `systemd` 服务 (`deskcare.service`)，实现开机自启和进程守护。
-5.  **启动验证**：启动服务并检查 API 健康状态。
+## 5. 远程服务维护
 
-### 4.3 静态资源与安装包更新
-*   **更新官网**：只需将最新的 `index.html` 及相关资源放入本地 `backend_python/static/` 目录，重新运行部署脚本即可。
-*   **发布新版本**：将新的安装包重命名为 `DeskCare_Setup.exe` 放入 `backend_python/files/`，修改 `version_info.json`，然后重新运行部署脚本。
+在 `backend/` 目录下，提供了一套远程维护脚本，方便您在本地直接控制云端服务：
 
-## 5. 本地开发与运行
+*   `service_start.bat`: 启动服务
+*   `service_stop.bat`: 停止服务
+*   `service_restart.bat`: 重启服务
+*   `service_status.bat`: 查看运行状态
+*   `service_logs.bat`: 实时查看服务器上的最后 50 行日志
 
-### 5.1 环境要求
-*   Python 3.8+
-*   pip
+## 6. 本地开发指南
 
-### 5.2 启动步骤
-1.  安装依赖：
-    ```bash
-    pip install -r requirements.txt
-    ```
-2.  启动服务：
-    ```bash
-    python run.py
-    ```
-    服务将运行在 `http://localhost:8000`。
+### 6.1 启动后端
+```bash
+cd backend
+pip install -r requirements.txt
+python run.py
+```
+后端服务地址: `http://localhost:8000`
 
-### 5.3 访问接口文档
-启动后，访问以下地址查看自动生成的 API 文档：
-*   Swagger UI: `http://localhost:8000/docs`
-*   ReDoc: `http://localhost:8000/redoc`
+### 6.2 启动前端
+```bash
+cd frontend
+npm install
+npm run dev
+```
+前端开发地址: `http://localhost:5173`

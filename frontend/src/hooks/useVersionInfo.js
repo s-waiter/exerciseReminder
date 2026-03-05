@@ -6,13 +6,18 @@ export const useVersionInfo = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/version.json')
+    // Use the correct API endpoint provided by backend
+    fetch('/updates/version.json')
       .then(res => res.json())
       .then(data => {
-        if (data.latest_version && data.download_url) {
-          setVersion(`v${data.latest_version}`);
-          const filename = data.download_url.split('/').pop();
-          setDownloadUrl(`/downloads/${filename}`);
+        if (data.version && data.download_url) {
+          setVersion(`v${data.version}`);
+          // Use the absolute URL provided by the backend directly
+          setDownloadUrl(data.download_url);
+        } else if (data.latest_version) {
+           // Fallback for older JSON format if any
+           setVersion(`v${data.latest_version}`);
+           setDownloadUrl(data.download_url);
         }
       })
       .catch(err => console.error("Failed to fetch version info:", err))

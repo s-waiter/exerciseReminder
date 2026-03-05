@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from sqlalchemy import func
 
 def get_download_key(db: Session, key: str):
@@ -83,15 +83,16 @@ def get_stats_overview(db: Session):
         "total_users": total_users
     }
 
-def get_visit_trend(db: Session, days: int = 7):
-    # This is a simplified trend query. For better performance on large datasets, consider raw SQL or optimization.
-    # Group by date
-    # SQLite date function usage: date(visited_at)
+def get_visit_trend(db: Session, days: int = 30):
+    start_date = date.today() - timedelta(days=days)
     results = db.query(
         func.date(models.WebsiteVisit.visited_at).label("date"),
         func.count(models.WebsiteVisit.id).label("pv"),
         func.count(func.distinct(models.WebsiteVisit.ip_address)).label("uv")
-    ).group_by("date").order_by("date").limit(days).all()
+    ).filter(func.date(models.WebsiteVisit.visited_at) >= start_date)\
+     .group_by("date")\
+     .order_by("date")\
+     .all()
     return results
 
 def get_geo_distribution(db: Session, limit: int = 10):

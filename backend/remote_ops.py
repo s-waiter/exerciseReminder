@@ -7,12 +7,24 @@ import argparse
 HOST = "47.101.52.0"
 USER = "root"
 PASS = "Pass1234"
+SSH_PORTS = [22]
 
 def create_client():
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(HOST, username=USER, password=PASS)
-    return client
+    
+    last_err = None
+    for port in SSH_PORTS:
+        try:
+            print(f"Connecting to {HOST}:{port}...")
+            client.connect(HOST, port=port, username=USER, password=PASS, timeout=5)
+            print(f"Connected via port {port}")
+            return client
+        except Exception as e:
+            print(f"Failed to connect on port {port}: {e}")
+            last_err = e
+            
+    raise last_err
 
 def run_command(cmd):
     client = create_client()

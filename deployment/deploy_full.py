@@ -18,21 +18,36 @@ except ImportError:
 HOST = "47.101.52.0"
 USER = "root"
 PASS = "Pass1234"
-REMOTE_BASE = "/opt/deskcare"
+# SSH Port configuration (Standard is 22)
+SSH_PORTS = [22] 
 
-# Paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+# Local paths
+# This script is now in deployment/ subdirectory, so we need to go up one level
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(BASE_DIR, "backend")
-STATIC_DIR = os.path.join(BACKEND_DIR, "app", "static") # Backend static file location
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
 VERSION_FILE = os.path.join(BASE_DIR, "version_info.json")
+
+# Remote paths
+REMOTE_BASE = "/opt/deskcare"
 
 def create_client():
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(HOST, username=USER, password=PASS)
-    return client
+    
+    last_err = None
+    for port in SSH_PORTS:
+        try:
+            print(f"Connecting to {HOST}:{port}...")
+            client.connect(HOST, port=port, username=USER, password=PASS, timeout=5)
+            print(f"Connected via port {port}")
+            return client
+        except Exception as e:
+            print(f"Failed to connect on port {port}: {e}")
+            last_err = e
+            
+    raise last_err
 
 def run_remote(client, cmd, ignore_errors=False):
     print(f"REMOTE: {cmd}")
@@ -69,15 +84,22 @@ def build_frontend():
         print(f"Error: Frontend directory not found at {FRONTEND_DIR}")
         return False
     
+    # Use user provided npm path
+    npm_cmd = r'"D:\jinzhan\Software\code\nodejs\npm.cmd"'
+    node_dir = r"D:\jinzhan\Software\code\nodejs"
+    
+    # Add node to PATH for this process
+    os.environ["PATH"] = node_dir + os.pathsep + os.environ["PATH"]
+    
     # Check if node_modules exists, if not install
     if not os.path.exists(os.path.join(FRONTEND_DIR, "node_modules")):
         print("Installing frontend dependencies...")
-        if os.system(f"cd {FRONTEND_DIR} && npm install") != 0:
+        if os.system(f"cd {FRONTEND_DIR} && {npm_cmd} install") != 0:
             print("Error: npm install failed")
             return False
 
     print("Running npm run build...")
-    if os.system(f"cd {FRONTEND_DIR} && npm run build") != 0:
+    if os.system(f"cd {FRONTEND_DIR} && {npm_cmd} run build") != 0:
         print("Error: npm run build failed")
         return False
     
@@ -93,11 +115,20 @@ def deploy_frontend_only(client, sftp):
 
     # 2. Upload to backend static folder on server
     print("Uploading static files...")
-    # Clean remote static dir
-    run_remote(client, f"rm -rf {REMOTE_BASE}/app/static/*", True)
-    run_remote(client, f"mkdir -p {REMOTE_BASE}/app/static", True)
+    # The structure on server is /opt/deskcare/static (root level) not /opt/deskcare/app/static
+    # Let's check main.py logic: 
+    # static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+    # if main.py is in /opt/deskcare/app/main.py, then dirname(main.py) is /opt/deskcare/app
+    # dirname(/opt/deskcare/app) is /opt/deskcare
+    # so static_dir is /opt/deskcare/static
     
-    upload_dir(sftp, DIST_DIR, f"{REMOTE_BASE}/app/static")
+    # So we should upload to /opt/deskcare/static
+    
+    # Clean remote static dir
+    run_remote(client, f"rm -rf {REMOTE_BASE}/static/*", True)
+    run_remote(client, f"mkdir -p {REMOTE_BASE}/static", True)
+    
+    upload_dir(sftp, DIST_DIR, f"{REMOTE_BASE}/static")
     print("Frontend deployment complete.")
 
 def deploy_backend_only(client, sftp):
@@ -143,15 +174,17 @@ def deploy_backend_only(client, sftp):
         r_path = f"{remote_app}/{item}"
         
         if os.path.isfile(l_path):
+            print(f"Uploading {item}...")
             sftp.put(l_path, r_path)
         elif os.path.isdir(l_path):
             upload_dir(sftp, l_path, r_path)
             
     # Upload root files
-    root_files = ["run.py", "requirements.txt"]
+    root_files = ["run.py", "requirements.txt", "alembic.ini"]
     for f in root_files:
         local_p = os.path.join(BACKEND_DIR, f)
         if os.path.exists(local_p):
+            print(f"Uploading {f}...")
             sftp.put(local_p, f"{REMOTE_BASE}/{f}")
 
     # 3. Update Dependencies
@@ -162,6 +195,27 @@ def deploy_backend_only(client, sftp):
     print("Restarting service...")
     run_remote(client, "systemctl daemon-reload")
     run_remote(client, "systemctl restart deskcare")
+    
+    # 5. Verify
+    print("Verifying deployment...")
+    time.sleep(5) # Wait for service to start
+    status = run_remote(client, "systemctl is-active deskcare")
+    print(f"Service status: {status}")
+    
+    if status.strip() != "active":
+        print("Error: Service is not active. Fetching logs...")
+        run_remote(client, "journalctl -u deskcare -n 20 --no-pager", True)
+    else:
+        # Check API health
+        try:
+            import urllib.request
+            resp = urllib.request.urlopen(f"http://{HOST}/docs", timeout=10)
+            if resp.status == 200:
+                print(f"API Check: OK (http://{HOST}/docs)")
+            else:
+                print(f"API Check: Failed (Status {resp.status})")
+        except Exception as e:
+             print(f"API Check: Failed ({e})")
     
     print("Backend deployment complete.")
 
@@ -197,18 +251,51 @@ def deploy_app_package(client, sftp):
     
     print(f"Uploading {filename}...")
     sftp.put(zip_path, f"{remote_files_dir}/{filename}")
+    run_remote(client, f"chmod 644 {remote_files_dir}/{filename}", True)
     
     # 2. Update version info on server
-    # We should also upload version_info.json if it exists
+    # Always generate new version_info based on root version_info.json
     if os.path.exists(VERSION_FILE):
-        print("Uploading version_info.json...")
-        sftp.put(VERSION_FILE, f"{remote_files_dir}/version_info.json")
+        print("Generating compatible version_info.json...")
+        with open(VERSION_FILE, "r") as f:
+            v_data = json.load(f)
+            
+        # Construct C++ compatible version info
+        version_str = f"{v_data['major']}.{v_data['minor']}.{v_data['patch']}"
+        remote_json = {
+            "version": version_str,
+            "latest_version": version_str,
+            "changelog": f"Update to version {version_str}",
+            "download_url": f"http://{HOST}/files/{filename}",
+            "major": v_data['major'],
+            "minor": v_data['minor'],
+            "patch": v_data['patch']
+        }
         
-        # Also, we might need to update a 'latest.zip' link or similar if the backend logic requires it.
-        # But our backend likely reads version_info.json to know what to serve.
-        # Based on previous code, backend serves /files/{filename}. 
-        # We need to make sure backend knows about this new file.
-        # Usually backend reads version_info.json.
+        # Write to temp file
+        with open("version_info_remote.json", "w") as f:
+            json.dump(remote_json, f, indent=4)
+            
+        print("Uploading version_info.json...")
+        
+        # 1. Force delete remote files to ensure no caching/stale inodes
+        print("Cleaning remote version files...")
+        run_remote(client, f"rm -f {REMOTE_BASE}/app/files/version_info.json", True)
+        run_remote(client, f"rm -f {REMOTE_BASE}/files/version_info.json", True)
+        
+        # 2. Upload to app/files location where backend reads it
+        # Ensure directory exists
+        run_remote(client, f"mkdir -p {REMOTE_BASE}/app/files", True)
+        sftp.put("version_info_remote.json", f"{REMOTE_BASE}/app/files/version_info.json")
+        run_remote(client, f"chmod 644 {REMOTE_BASE}/app/files/version_info.json", True)
+        
+        # 3. Also upload to root files if needed
+        # Ensure directory exists
+        run_remote(client, f"mkdir -p {REMOTE_BASE}/files", True)
+        sftp.put("version_info_remote.json", f"{REMOTE_BASE}/files/version_info.json")
+        run_remote(client, f"chmod 644 {REMOTE_BASE}/files/version_info.json", True)
+        
+        os.remove("version_info_remote.json")
         
     print("Application package deployment complete.")
 
@@ -226,7 +313,7 @@ def main():
         sftp = client.open_sftp()
     except Exception as e:
         print(f"Connection failed: {e}")
-        return
+        sys.exit(1)
 
     if args.mode == "frontend" or args.mode == "all":
         deploy_frontend_only(client, sftp)

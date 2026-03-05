@@ -61,3 +61,8 @@ class WebsiteVisit(Base):
     browser = Column(String, nullable=True)
     device_type = Column(String, nullable=True) # PC, Mobile, Tablet
     visited_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # New fields for deep analysis
+    duration_seconds = Column(Integer, default=0)
+    is_downloaded = Column(Boolean, default=False)
+    downloaded_version = Column(String, nullable=True)

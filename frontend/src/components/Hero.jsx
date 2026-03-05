@@ -4,7 +4,7 @@ import { Download, ChevronRight, PlayCircle, AlertTriangle, Clock, Activity, Cof
 import ParticleBackground from './ParticleBackground';
 import { useVersionInfo } from '../hooks/useVersionInfo';
 
-const Hero = () => {
+const Hero = ({ trackDownload }) => {
   const { version, downloadUrl, loading } = useVersionInfo();
 
   return (
@@ -69,7 +69,7 @@ const Hero = () => {
                 加载版本信息...
              </button>
           ) : (
-            <a href={downloadUrl || "#"} download={!!downloadUrl} className={`group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden ${!downloadUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
+            <a href={downloadUrl || "#"} download={!!downloadUrl} onClick={() => trackDownload && trackDownload(version)} className={`group relative inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium text-white transition-all duration-200 bg-teal-600 rounded-lg hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-600 focus:ring-offset-slate-900 overflow-hidden ${!downloadUrl ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
                <span className="absolute inset-0 w-full h-full -mt-10 transition-all duration-700 ease-out transform translate-x-full translate-y-full bg-gradient-to-br from-teal-400 to-cyan-300 group-hover:mb-32 group-hover:mr-0 group-hover:translate-x-0 group-hover:translate-y-0 opacity-30"></span>
                <Download className="mr-2 h-5 w-5" />
                免费下载 Windows 版
