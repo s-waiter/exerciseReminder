@@ -15,7 +15,20 @@ router = APIRouter(
 # Configuration: Path to the installer
 # Ensure this directory exists and contains the installer
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DOWNLOAD_FILE_PATH = os.path.join(BASE_DIR, "files", "DeskCare_Setup.zip") 
+# Try multiple possible locations for the installer
+POSSIBLE_PATHS = [
+    os.path.join(BASE_DIR, "files", "DeskCare_Setup.zip"),
+    "/opt/deskcare/files/DeskCare_Setup.zip", # Production path
+    "D:/jinzhan/code/trae/DeskCare/backend/files/DeskCare_Setup.zip" # Local absolute path
+]
+
+def get_installer_path():
+    for path in POSSIBLE_PATHS:
+        if os.path.exists(path):
+            return path
+    return None
+
+DOWNLOAD_FILE_PATH = get_installer_path()
 
 @router.get("/status")
 def get_download_status(db: Session = Depends(get_db)):
@@ -54,14 +67,17 @@ def verify_code(code: str = Body(None, embed=True), db: Session = Depends(get_db
 
 @router.get("/file")
 async def download_file(code: str, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # Re-evaluate path on each request in case file was added later
+    current_file_path = get_installer_path()
+    
     # 1. Check Global Config first
     config = crud.get_system_config(db, "require_download_code")
     require_code = config.value == "true" if config else True
     
     if not require_code and code == "public_access":
-         if not os.path.exists(DOWNLOAD_FILE_PATH):
+         if not current_file_path:
             return JSONResponse(status_code=404, content={"detail": "安装包文件未找到"})
-         return FileResponse(DOWNLOAD_FILE_PATH, media_type="application/zip", filename="DeskCare_Setup.zip")
+         return FileResponse(current_file_path, media_type="application/zip", filename="DeskCare_Setup.zip")
 
     # 2. Verify Code
     db_key = crud.get_download_key(db, code)
@@ -78,14 +94,14 @@ async def download_file(code: str, request: Request, background_tasks: Backgroun
     if db_key.max_uses and (db_key.usage_count or 0) >= db_key.max_uses:
          return JSONResponse(status_code=403, content={"detail": "此下载码已达到最大使用次数"})
 
-    if not os.path.exists(DOWNLOAD_FILE_PATH):
+    if not current_file_path:
         # Fallback for dev
-        return JSONResponse(status_code=404, content={"detail": "安装包文件未找到 (Dev Note: Place DeskCare_Setup.zip in backend/files/)"})
+        return JSONResponse(status_code=404, content={"detail": "安装包文件未找到"})
 
     # Mark as used (increments count, sets is_used if one_time)
     crud.mark_key_used(db, db_key, request.client.host)
 
-    return FileResponse(DOWNLOAD_FILE_PATH, media_type="application/zip", filename="DeskCare_Setup.zip")
+    return FileResponse(current_file_path, media_type="application/zip", filename="DeskCare_Setup.zip")
 
 def mark_key_bg(key_id: int, ip: str):
     db = SessionLocal()
