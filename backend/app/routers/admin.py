@@ -63,12 +63,22 @@ def get_website_stats(
     }
 
 @router.get("/stats/app")
-def get_app_stats(token: str, db: Session = Depends(get_db)):
+def get_app_stats(
+    token: str, 
+    date: str = None, 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
     get_current_admin(token)
-    trend = crud.get_dau_trend(db, 30)
-    logs = crud.get_app_usage_logs(db, 0, 100)
+    trend = crud.get_dau_trend(db, 90) # Show 90 days trend
+    geo = crud.get_app_geo_distribution(db, 10)
+    
+    # Filter logs by date if provided
+    logs = crud.get_app_usage_logs(db, 0, limit, date)
+    
     return {
         "trend": trend,
+        "geo": geo,
         "logs": logs
     }
 

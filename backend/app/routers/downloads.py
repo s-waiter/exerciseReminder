@@ -15,20 +15,50 @@ router = APIRouter(
 # Configuration: Path to the installer
 # Ensure this directory exists and contains the installer
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Try multiple possible locations for the installer
-POSSIBLE_PATHS = [
-    os.path.join(BASE_DIR, "files", "DeskCare_Setup.zip"),
-    "/opt/deskcare/files/DeskCare_Setup.zip", # Production path
-    "D:/jinzhan/code/trae/DeskCare/backend/files/DeskCare_Setup.zip" # Local absolute path
-]
+
+def get_latest_version_file(directory):
+    """Helper to find the latest versioned zip file in a directory using semantic versioning."""
+    if not os.path.exists(directory):
+        return None
+        
+    files = [f for f in os.listdir(directory) if f.startswith("DeskCare_v") and f.endswith(".zip")]
+    if not files:
+        return None
+        
+    def version_key(filename):
+        # Extract "1.0.9" from "DeskCare_v1.0.9.zip"
+        try:
+            v_str = filename.replace("DeskCare_v", "").replace(".zip", "")
+            return tuple(map(int, v_str.split(".")))
+        except:
+            return (0, 0, 0)
+
+    files.sort(key=version_key)
+    return os.path.join(directory, files[-1])
 
 def get_installer_path():
-    for path in POSSIBLE_PATHS:
-        if os.path.exists(path):
-            return path
+    # 1. Search in Production/Standard Path (/opt/deskcare/files)
+    prod_path = get_latest_version_file("/opt/deskcare/files")
+    if prod_path:
+        return prod_path
+            
+    # 2. Search in Local Dev Path (backend/files)
+    local_path = get_latest_version_file(os.path.join(BASE_DIR, "files"))
+    if local_path:
+        return local_path
+
+    # 3. Fallback: deployment/releases (Local Dev Only)
+    try:
+        releases_dir = os.path.join(os.path.dirname(BASE_DIR), "deployment", "releases")
+        dev_path = get_latest_version_file(releases_dir)
+        if dev_path:
+            return dev_path
+    except:
+        pass
+        
     return None
 
-DOWNLOAD_FILE_PATH = get_installer_path()
+DOWNLOAD_FILE_PATH = None # Calculated per request now
 
 @router.get("/status")
 def get_download_status(db: Session = Depends(get_db)):
@@ -77,7 +107,7 @@ async def download_file(code: str, request: Request, background_tasks: Backgroun
     if not require_code and code == "public_access":
          if not current_file_path:
             return JSONResponse(status_code=404, content={"detail": "安装包文件未找到"})
-         return FileResponse(current_file_path, media_type="application/zip", filename="DeskCare_Setup.zip")
+         return FileResponse(current_file_path, media_type="application/zip", filename=os.path.basename(current_file_path))
 
     # 2. Verify Code
     db_key = crud.get_download_key(db, code)
@@ -101,7 +131,7 @@ async def download_file(code: str, request: Request, background_tasks: Backgroun
     # Mark as used (increments count, sets is_used if one_time)
     crud.mark_key_used(db, db_key, request.client.host)
 
-    return FileResponse(current_file_path, media_type="application/zip", filename="DeskCare_Setup.zip")
+    return FileResponse(current_file_path, media_type="application/zip", filename=os.path.basename(current_file_path))
 
 def mark_key_bg(key_id: int, ip: str):
     db = SessionLocal()

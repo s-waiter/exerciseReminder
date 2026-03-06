@@ -126,8 +126,21 @@ def get_dau_trend(db: Session, days: int = 30):
     result_list.sort(key=lambda x: x["date"])
     return result_list
 
-def get_app_usage_logs(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.AppUsage).order_by(models.AppUsage.last_seen.desc()).offset(skip).limit(limit).all()
+def get_app_usage_logs(db: Session, skip: int = 0, limit: int = 100, target_date: str = None):
+    query = db.query(models.AppUsage)
+    
+    if target_date:
+        query = query.filter(models.AppUsage.date == target_date)
+        
+    return query.order_by(models.AppUsage.last_seen.desc()).offset(skip).limit(limit).all()
+
+def get_app_geo_distribution(db: Session, limit: int = 10):
+    results = db.query(
+        models.AppUsage.city,
+        func.count(models.AppUsage.id).label("count")
+    ).group_by(models.AppUsage.city).order_by(func.count(models.AppUsage.id).desc()).limit(limit).all()
+    
+    return [{"city": r.city, "count": r.count} for r in results]
 
 # --- Website Visits ---
 def create_website_visit(db: Session, visit: schemas.WebsiteVisitCreate):

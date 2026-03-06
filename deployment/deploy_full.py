@@ -74,7 +74,10 @@ def upload_dir(sftp, local_dir, remote_dir):
         
         if os.path.isfile(local_path):
             print(f"Uploading {item}...")
-            sftp.put(local_path, remote_path)
+            try:
+                sftp.put(local_path, remote_path)
+            except Exception as e:
+                print(f"Error uploading {item}: {e}")
         elif os.path.isdir(local_path):
             upload_dir(sftp, local_path, remote_path)
 
@@ -176,6 +179,91 @@ def deploy_backend_only(client, sftp):
             print(f"Uploading {f}...")
             sftp.put(local_p, f"{REMOTE_BASE}/{f}")
 
+    # Upload 'files' directory (Installer)
+    local_files_dir = os.path.join(BACKEND_DIR, "files")
+    
+    # Check deployment/releases for the latest version zip
+    # We DO NOT rename it to DeskCare_Setup.zip anymore to avoid confusion
+    # We upload it as is, and backend will find the latest version dynamically
+    deployment_releases_dir = os.path.join(BASE_DIR, "deployment", "releases")
+    if os.path.exists(deployment_releases_dir):
+        # Find latest zip with semantic version sorting
+        files = [f for f in os.listdir(deployment_releases_dir) if f.startswith("DeskCare_v") and f.endswith(".zip")]
+        if files:
+            def version_key(filename):
+                # Extract "1.0.9" from "DeskCare_v1.0.9.zip"
+                try:
+                    v_str = filename.replace("DeskCare_v", "").replace(".zip", "")
+                    return tuple(map(int, v_str.split(".")))
+                except:
+                    return (0, 0, 0)
+
+            files.sort(key=version_key)
+            latest_zip = files[-1]
+            src_zip = os.path.join(deployment_releases_dir, latest_zip)
+            
+            # Ensure local backend/files exists
+            if not os.path.exists(local_files_dir):
+                os.makedirs(local_files_dir)
+                
+            # Copy to backend/files with ORIGINAL NAME
+            dest_zip = os.path.join(local_files_dir, latest_zip)
+            
+            # Remove ALL files in local backend/files to ensure clean state
+            # This prevents uploading stale files like DeskCare_Setup.exe or old zips
+            for f in os.listdir(local_files_dir):
+                file_path = os.path.join(local_files_dir, f)
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}: {e}")
+            
+            print(f"Copying latest release {latest_zip} to {dest_zip}...")
+            shutil.copy2(src_zip, dest_zip)
+            
+            # Automatically update version_info.json based on the latest zip filename
+            # This ensures the version info is ALWAYS in sync with the uploaded file
+            try:
+                # Extract version from filename: DeskCare_v1.0.8.zip -> 1.0.8
+                v_str = latest_zip.replace("DeskCare_v", "").replace(".zip", "")
+                parts = list(map(int, v_str.split(".")))
+                if len(parts) == 3:
+                    new_version_data = {
+                        "major": parts[0],
+                        "minor": parts[1],
+                        "patch": parts[2],
+                        "version": v_str,
+                        "latest_version": v_str
+                    }
+                    print(f"Updating version_info.json to match release: {v_str}")
+                    with open(os.path.join(local_files_dir, "version_info.json"), "w") as f:
+                        json.dump(new_version_data, f, indent=4)
+            except Exception as e:
+                print(f"Failed to auto-update version_info.json: {e}")
+                # Fallback to copying existing file if auto-update fails
+                if os.path.exists(VERSION_FILE):
+                    print(f"Copying existing version_info.json to {local_files_dir}...")
+                    shutil.copy2(VERSION_FILE, os.path.join(local_files_dir, "version_info.json"))
+
+    # Force upload files directory if it exists, EVEN IF no new zip found (to update version_info.json)
+    if os.path.exists(local_files_dir):
+        print("Uploading files directory (Installer & Version Info)...")
+        remote_files_dir = f"{REMOTE_BASE}/files"
+        run_remote(client, f"mkdir -p {remote_files_dir}", True)
+        
+        # Clean remote files directory before uploading new version to save space
+        # This removes all files in files/ so only the latest version remains
+        print("Cleaning old remote release files...")
+        run_remote(client, f"rm -rf {remote_files_dir}/*", True)
+        
+        upload_dir(sftp, local_files_dir, remote_files_dir)
+        
+        # Ensure version_info.json has correct permissions
+        run_remote(client, f"chmod 644 {remote_files_dir}/version_info.json", True)
+
     # 3. Update Dependencies
     print("Checking dependencies...")
     # Using the virtualenv on server
@@ -260,7 +348,7 @@ def deploy_backend_only(client, sftp):
 def get_latest_zip():
     # Find DeskCare_vX.X.X.zip in RELEASES_DIR
     import glob
-    releases_dir = os.path.join(BASE_DIR, "releases")
+    releases_dir = os.path.join(BASE_DIR, "deployment", "releases")
     if not os.path.exists(releases_dir):
         print(f"Warning: {releases_dir} does not exist.")
         return None
@@ -462,7 +550,15 @@ def main():
         deploy_backend_only(client, sftp)
         
     if args.mode == "app" or args.mode == "all":
-        deploy_app_package(client, sftp)
+        # Check deployment/releases for the latest version zip
+        # We need to manually trigger the file upload logic here if not already done by deploy_backend_only
+        # But wait, deploy_backend_only already includes the file upload logic!
+        # If mode is 'app', we should probably just run the file upload part.
+        # However, for simplicity and robustness, let's just reuse deploy_backend_only
+        # as it handles version syncing and everything properly.
+        # Re-running backend deploy is safe and ensures config consistency.
+        if args.mode == "app": # If 'all', it's already run above
+             deploy_backend_only(client, sftp)
 
     sftp.close()
     client.close()

@@ -11,12 +11,12 @@ export const useVersionInfo = () => {
     fetch('/updates/version.json')
       .then(res => res.json())
       .then(data => {
-        if (data.version) {
-          setVersion(`v${data.version}`);
+        let v = data.version || data.latest_version;
+        if (v) {
+          // Ensure we don't double 'v' prefix
+          if (v.startsWith('v')) v = v.substring(1);
+          setVersion(`v${v}`);
           setDownloadUrl(data.download_url);
-        } else if (data.latest_version) {
-           setVersion(`v${data.latest_version}`);
-           setDownloadUrl(data.download_url);
         }
       })
       .catch(err => console.error("Failed to fetch version info:", err));
