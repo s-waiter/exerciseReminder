@@ -466,7 +466,10 @@ Window {
     property int savedY: 0
     // 交互点坐标，用于粒子吸引效果
     property point interactionPoint: Qt.point(width/2, height/2)
-    flags: Qt.FramelessWindowHint | Qt.Window
+    // 动态调整窗口标志：
+    // Normal 模式：Qt.Window (显示在任务栏)
+    // Mini 模式：Qt.Tool (不显示在任务栏，类似悬浮窗)
+    flags: Qt.FramelessWindowHint | (isPinned ? Qt.Tool : Qt.Window)
 
     // ========================================================================
     // 属性动画 (Behavior)
